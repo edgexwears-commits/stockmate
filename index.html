@@ -124,6 +124,7 @@ tr:hover td{background:var(--surface2)}
 /* Action buttons */
 .abtn{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px 6px;border-radius:var(--r);font-size:15px;line-height:1}
 .abtn:hover{color:var(--text);background:var(--surface2)}
+.abtn.del:hover{color:var(--red)!important;background:var(--red-bg)!important}
 /* Photo */
 .photo-thumb{width:34px;height:34px;border-radius:var(--r);object-fit:cover;border:1px solid var(--border);flex-shrink:0}
 .photo-ph{width:34px;height:34px;border-radius:var(--r);background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text3)}
@@ -240,7 +241,7 @@ tr:hover td{background:var(--surface2)}
 <div id="v-inventory">
   <div class="toolbar">
     <input type="text" id="srch" placeholder="Search name, SKU, category..." oninput="renderTable()"/>
-    <select id="fcat" onchange="renderTable()"><option value="">All categories</option><option>Tops</option><option>Bottoms</option><option>Dresses</option><option>Outerwear</option><option>Sleepwear</option><option>Accessories</option></select>
+    <select id="fcat" onchange="renderTable()"><option value="">All categories</option><option>Frocks</option><option>Tops</option><option>Skirts</option><option>Plazas</option><option>Bottoms</option><option>Shirts</option></select>
     <select id="fgen" onchange="renderTable()"><option value="">All genders</option><option>Boys</option><option>Girls</option><option>Unisex</option></select>
     <select id="fsort" onchange="renderTable()"><option value="name">Name</option><option value="stock_asc">Stock: low first</option><option value="stock_desc">Stock: high first</option><option value="price_asc">Price: low</option><option value="val_desc">Value: high</option></select>
   </div>
@@ -262,7 +263,7 @@ tr:hover td{background:var(--surface2)}
 <div id="v-catalogue" style="display:none">
   <div class="toolbar">
     <input type="text" id="cat-srch" placeholder="Search..." oninput="renderCat()"/>
-    <select id="cat-fcat" onchange="renderCat()"><option value="">All categories</option><option>Tops</option><option>Bottoms</option><option>Dresses</option><option>Outerwear</option><option>Sleepwear</option><option>Accessories</option></select>
+    <select id="cat-fcat" onchange="renderCat()"><option value="">All categories</option><option>Frocks</option><option>Tops</option><option>Skirts</option><option>Plazas</option><option>Bottoms</option><option>Shirts</option></select>
     <select id="cat-fs" onchange="renderCat()"><option value="">All stock</option><option value="ok">In stock</option><option value="low">Low</option><option value="out">Out</option></select>
     <div class="vt"><button class="vtb on" id="vt-g" onclick="setView('g')"><i class="ti ti-layout-grid"></i></button><button class="vtb" id="vt-l" onclick="setView('l')"><i class="ti ti-list"></i></button></div>
   </div>
@@ -352,7 +353,7 @@ const R='Rs. ';
 const fmt=v=>R+Math.round(v).toLocaleString('en-LK');
 const COLS={Red:'#E24B4A',White:'#d0d0d0',Blue:'#378ADD',Pink:'#D4537E',Green:'#639922',Yellow:'#EF9F27',Purple:'#7F77DD',Navy:'#185FA5',Orange:'#D85A30',Grey:'#888780',Black:'#3a3a3a',Brown:'#854F0B',Teal:'#1D9E75'};
 const SIZES=['NB','3M','6M','12M','18M','2Y','3Y','4Y','5Y','6Y','7Y','8Y','One Size'];
-const CATS=['Tops','Bottoms','Dresses','Outerwear','Sleepwear','Accessories'];
+const CATS=['Frocks','Tops','Skirts','Plazas','Bottoms','Shirts'];
 const GENDERS=['Boys','Girls','Unisex'];
 
 // ─── State ───────────────────────────────────────────────────
@@ -466,15 +467,15 @@ async function loadFromGS(){
 function loadDemoData(){
   inv=[
     {id:1,sku:'KC-001',name:'Dino Print T-shirt',cat:'Tops',gender:'Boys',sizes:['2Y','3Y','4Y','5Y','6Y'],colors:['Green','White'],stock:32,cost:450,price:990,low:10,sold:24,photo:null},
-    {id:2,sku:'KC-002',name:'Floral Frock',cat:'Dresses',gender:'Girls',sizes:['3Y','4Y','5Y','6Y','7Y'],colors:['Pink','White'],stock:7,cost:680,price:1450,low:8,sold:18,photo:null},
+    {id:2,sku:'KC-002',name:'Floral Frock',cat:'Frocks',gender:'Girls',sizes:['3Y','4Y','5Y','6Y','7Y'],colors:['Pink','White'],stock:7,cost:680,price:1450,low:8,sold:18,photo:null},
     {id:3,sku:'KC-003',name:'Stretch Denim Jeans',cat:'Bottoms',gender:'Unisex',sizes:['2Y','3Y','4Y','5Y'],colors:['Blue','Black'],stock:3,cost:890,price:1990,low:6,sold:31,photo:null},
-    {id:4,sku:'KC-004',name:'Rainbow Hoodie',cat:'Outerwear',gender:'Girls',sizes:['4Y','5Y','6Y','7Y'],colors:['Purple','Pink'],stock:14,cost:1100,price:2490,low:5,sold:12,photo:null},
-    {id:5,sku:'KC-005',name:'Stripe Pyjama Set',cat:'Sleepwear',gender:'Unisex',sizes:['2Y','3Y','4Y'],colors:['Blue','Red'],stock:5,cost:590,price:1290,low:6,sold:20,photo:null},
-    {id:6,sku:'KC-006',name:'Beanie & Mittens',cat:'Accessories',gender:'Unisex',sizes:['One Size'],colors:['Navy','Grey'],stock:21,cost:280,price:650,low:8,sold:9,photo:null},
+    {id:4,sku:'KC-004',name:'Rainbow Hoodie',cat:'Tops',gender:'Girls',sizes:['4Y','5Y','6Y','7Y'],colors:['Purple','Pink'],stock:14,cost:1100,price:2490,low:5,sold:12,photo:null},
+    {id:5,sku:'KC-005',name:'Stripe Pyjama Set',cat:'Shirts',gender:'Unisex',sizes:['2Y','3Y','4Y'],colors:['Blue','Red'],stock:5,cost:590,price:1290,low:6,sold:20,photo:null},
+    {id:6,sku:'KC-006',name:'Beanie & Mittens',cat:'Skirts',gender:'Unisex',sizes:['One Size'],colors:['Navy','Grey'],stock:21,cost:280,price:650,low:8,sold:9,photo:null},
     {id:7,sku:'KC-007',name:'Cargo Shorts',cat:'Bottoms',gender:'Boys',sizes:['4Y','5Y','6Y','7Y'],colors:['Brown','Green','Navy'],stock:2,cost:520,price:1150,low:5,sold:27,photo:null},
     {id:8,sku:'KC-008',name:'Glitter Leggings',cat:'Bottoms',gender:'Girls',sizes:['3Y','4Y','5Y','6Y'],colors:['Pink','Purple','Black'],stock:18,cost:390,price:890,low:8,sold:35,photo:null},
     {id:9,sku:'KC-009',name:'Cotton Romper',cat:'Tops',gender:'Unisex',sizes:['NB','3M','6M','12M'],colors:['White','Yellow','Teal'],stock:26,cost:350,price:790,low:10,sold:42,photo:null},
-    {id:10,sku:'KC-010',name:'Quilted Jacket',cat:'Outerwear',gender:'Boys',sizes:['3Y','4Y','5Y','6Y'],colors:['Navy','Orange'],stock:0,cost:1400,price:3200,low:4,sold:8,photo:null},
+    {id:10,sku:'KC-010',name:'Quilted Jacket',cat:'Tops',gender:'Boys',sizes:['3Y','4Y','5Y','6Y'],colors:['Navy','Orange'],stock:0,cost:1400,price:3200,low:4,sold:8,photo:null},
   ];
   history=[
     {type:'sale',name:'Dino Print T-shirt',sku:'KC-001',qty:4,size:'4Y',color:'Green',total:3960,date:'Today, 10:32 am'},
@@ -689,10 +690,24 @@ function saveWACfg(){
 }
 
 async function sendWA(msg){
-  if(!waConfig.phone||!waConfig.apikey){addNLog('failed','Not configured',msg);return false;}
-  const url=`https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(waConfig.phone)}&text=${encodeURIComponent(msg)}&apikey=${waConfig.apikey}`;
-  try{await fetch(url,{mode:'no-cors'});addNLog('sent','WhatsApp message sent',msg);return true;}
-  catch(e){addNLog('failed','Send failed',msg);return false;}
+  if(!waConfig.phone||!waConfig.apikey){
+    addNLog('failed','Not configured — enter phone & API key in WhatsApp tab',msg);
+    toast('WhatsApp not configured. Go to WhatsApp tab.','err');
+    return false;
+  }
+  let phone=waConfig.phone.trim();
+  if(!phone.startsWith('+'))phone='+'+phone;
+  const url='https://api.callmebot.com/whatsapp.php?phone='+encodeURIComponent(phone)+'&text='+encodeURIComponent(msg)+'&apikey='+encodeURIComponent(waConfig.apikey.trim());
+  try{
+    await fetch(url,{mode:'no-cors'});
+    addNLog('sent','Message sent to '+phone,msg);
+    toast('WhatsApp message sent ✓','ok');
+    return true;
+  }catch(e){
+    addNLog('failed','Send failed: '+e.message,msg);
+    toast('WhatsApp send failed','err');
+    return false;
+  }
 }
 
 function addNLog(status,label,msg){
@@ -829,6 +844,7 @@ function doRestock(id){
   </div>`);
 }
 
+function doDelete(id){const i=inv.find(x=>x.id===id);const name=i?i.name:"item";inv=inv.filter(x=>x.id!==id);closeModal();lsSave();renderAll();toast('"'+name+'" deleted','ok');}
 function confirmDel(id){
   const i=inv.find(x=>x.id===id);
   showModal(`<div class="modal modal-sm"><div class="mh"><h2>Remove item</h2><button class="abtn" onclick="closeModal()"><i class="ti ti-x"></i></button></div>
