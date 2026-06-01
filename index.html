@@ -235,6 +235,8 @@ tr:hover td{background:var(--surface2)}
   <button class="tab" onclick="sw('alerts')" id="tab-alerts"><i class="ti ti-bell" style="font-size:13px"></i>Alerts <span class="tbadge" id="abadge" style="display:none">0</span></button>
   <button class="tab" onclick="sw('orders')" id="tab-orders"><i class="ti ti-truck" style="font-size:13px"></i>Orders</button>
   <button class="tab" onclick="sw('whatsapp')" id="tab-whatsapp"><i class="ti ti-brand-whatsapp" style="font-size:13px"></i>WhatsApp</button>
+  <button class="tab" onclick="sw('finance')" id="tab-finance"><i class="ti ti-cash" style="font-size:13px"></i>Finance</button>
+  <button class="tab" onclick="sw('cusorders')" id="tab-cusorders"><i class="ti ti-package" style="font-size:13px"></i>Customer Orders <span class="tbadge" id="co-badge" style="display:none">0</span></button>
 </div>
 
 <!-- Inventory -->
@@ -351,6 +353,54 @@ tr:hover td{background:var(--surface2)}
   <div class="nlog" id="notif-log"><div style="padding:20px;text-align:center;color:var(--text2);font-size:13px">No notifications sent yet.</div></div>
 </div>
 
+
+<div id="v-finance" style="display:none">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px" id="fin-metrics"></div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:14px"><i class="ti ti-plus"></i> Add transaction</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Type</label><select id="fin-type" onchange="updateFinCats()" style="width:100%;font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 10px;background:var(--surface);color:var(--text)"><option value="income">Income</option><option value="expense">Expense</option></select></div>
+      <div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Category</label><select id="fin-cat" style="width:100%;font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 10px;background:var(--surface);color:var(--text)"><option>Sales revenue</option></select></div>
+      <div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Amount (LKR)</label><input id="fin-amount" type="number" min="0" placeholder="0" style="width:100%;font-size:13px"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Description</label><input id="fin-desc" type="text" placeholder="e.g. Rent for June..." style="width:100%;font-size:13px"/></div>
+      <div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Date</label><input id="fin-date" type="date" style="width:100%;font-size:13px"/></div>
+    </div>
+    <button onclick="addFinRecord()" style="background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer"><i class="ti ti-plus"></i> Add record</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <select id="fin-ftype" onchange="renderFinance()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text)"><option value="">All types</option><option value="income">Income</option><option value="expense">Expense</option></select>
+    <select id="fin-fperiod" onchange="renderFinance()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text)"><option value="all">All time</option><option value="today">Today</option><option value="week">This week</option><option value="month">This month</option></select>
+    <input type="text" id="fin-srch" placeholder="Search..." oninput="renderFinance()" style="flex:1;min-width:120px;font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text)"/>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden" id="fin-list"></div>
+</div>
+
+
+<div id="v-cusorders" style="display:none">
+  <!-- Summary -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px" id="co-metrics"></div>
+
+  <!-- New order button -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+    <button onclick="openCOModal()" style="background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px"><i class="ti ti-plus"></i> New customer order</button>
+  </div>
+
+  <!-- Filter -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <select id="co-fstatus" onchange="renderCusOrders()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text)">
+      <option value="">All orders</option>
+      <option value="pending">Pending</option>
+      <option value="delivered">Delivered</option>
+      <option value="returned">Returned</option>
+    </select>
+    <input type="text" id="co-srch" placeholder="Search customer, phone..." oninput="renderCusOrders()" style="flex:1;min-width:140px;font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text)"/>
+  </div>
+
+  <div id="co-list"></div>
+</div>
+
 </div><!-- .app -->
 
 <!-- Toast container -->
@@ -361,7 +411,7 @@ tr:hover td{background:var(--surface2)}
 const R='Rs. ';
 const fmt=v=>R+Math.round(v).toLocaleString('en-LK');
 const COLS={Red:'#E24B4A',White:'#d0d0d0',Blue:'#378ADD',Pink:'#D4537E',Green:'#639922',Yellow:'#EF9F27',Purple:'#7F77DD',Navy:'#185FA5',Orange:'#D85A30',Grey:'#888780',Black:'#3a3a3a',Brown:'#854F0B',Teal:'#1D9E75'};
-const SIZES=['NB','3M','6M','12M','18M','2Y','3Y','4Y','5Y','6Y','7Y','8Y','One Size'];
+const SIZES=['S','M','L','XL','XXL','XXXL'];
 const CATS=['Frocks','Tops','Skirts','Plazas','Bottoms','Shirts'];
 const GENDERS=['Boys','Girls','Unisex'];
 
@@ -474,28 +524,7 @@ async function loadFromGS(){
 
 // ─── Demo data ───────────────────────────────────────────────
 function loadDemoData(){
-  inv=[
-    {id:1,sku:'KC-001',name:'Dino Print T-shirt',cat:'Tops',gender:'Boys',sizes:['2Y','3Y','4Y','5Y','6Y'],colors:['Green','White'],stock:32,cost:450,price:990,low:10,sold:24,photo:null},
-    {id:2,sku:'KC-002',name:'Floral Frock',cat:'Frocks',gender:'Girls',sizes:['3Y','4Y','5Y','6Y','7Y'],colors:['Pink','White'],stock:7,cost:680,price:1450,low:8,sold:18,photo:null},
-    {id:3,sku:'KC-003',name:'Stretch Denim Jeans',cat:'Bottoms',gender:'Unisex',sizes:['2Y','3Y','4Y','5Y'],colors:['Blue','Black'],stock:3,cost:890,price:1990,low:6,sold:31,photo:null},
-    {id:4,sku:'KC-004',name:'Rainbow Hoodie',cat:'Tops',gender:'Girls',sizes:['4Y','5Y','6Y','7Y'],colors:['Purple','Pink'],stock:14,cost:1100,price:2490,low:5,sold:12,photo:null},
-    {id:5,sku:'KC-005',name:'Stripe Pyjama Set',cat:'Shirts',gender:'Unisex',sizes:['2Y','3Y','4Y'],colors:['Blue','Red'],stock:5,cost:590,price:1290,low:6,sold:20,photo:null},
-    {id:6,sku:'KC-006',name:'Beanie & Mittens',cat:'Skirts',gender:'Unisex',sizes:['One Size'],colors:['Navy','Grey'],stock:21,cost:280,price:650,low:8,sold:9,photo:null},
-    {id:7,sku:'KC-007',name:'Cargo Shorts',cat:'Bottoms',gender:'Boys',sizes:['4Y','5Y','6Y','7Y'],colors:['Brown','Green','Navy'],stock:2,cost:520,price:1150,low:5,sold:27,photo:null},
-    {id:8,sku:'KC-008',name:'Glitter Leggings',cat:'Bottoms',gender:'Girls',sizes:['3Y','4Y','5Y','6Y'],colors:['Pink','Purple','Black'],stock:18,cost:390,price:890,low:8,sold:35,photo:null},
-    {id:9,sku:'KC-009',name:'Cotton Romper',cat:'Tops',gender:'Unisex',sizes:['NB','3M','6M','12M'],colors:['White','Yellow','Teal'],stock:26,cost:350,price:790,low:10,sold:42,photo:null},
-    {id:10,sku:'KC-010',name:'Quilted Jacket',cat:'Tops',gender:'Boys',sizes:['3Y','4Y','5Y','6Y'],colors:['Navy','Orange'],stock:0,cost:1400,price:3200,low:4,sold:8,photo:null},
-  ];
-  history=[
-    {type:'sale',name:'Dino Print T-shirt',sku:'KC-001',qty:4,size:'4Y',color:'Green',total:3960,date:'Today, 10:32 am'},
-    {type:'restock',name:'Stretch Denim Jeans',sku:'KC-003',qty:10,size:'3Y',color:'Blue',total:8900,date:'Today, 9:15 am'},
-    {type:'sale',name:'Floral Frock',sku:'KC-002',qty:2,size:'5Y',color:'Pink',total:2900,date:'Yesterday'},
-  ];
-  orders=[
-    {id:'PO-0001',supplier:'Sunshine Garments',date:'May 25, 2026',status:'Received',items:[{name:'Dino Print T-shirt',qty:20,cost:450}],total:9000},
-    {id:'PO-0002',supplier:'Little Stars Textiles',date:'May 28, 2026',status:'Pending',items:[{name:'Floral Frock',qty:10,cost:680}],total:6800},
-  ];
-  nextId=11; nextPO=3;
+  inv=[];history=[];orders=[];nextId=1;nextPO=1;
 }
 
 // ─── Toast ────────────────────────────────────────────────────
@@ -619,6 +648,16 @@ function uploadFor(id){
 }
 
 // ─── History ──────────────────────────────────────────────────
+
+function deleteHistItem(idx){
+  if(!confirm('Delete this record?')) return;
+  history.splice(idx,1);
+  lsSave();
+  renderHist();
+  renderMetrics();
+  toast('Record deleted','ok');
+}
+
 function renderHist(){
   const f=(document.getElementById('hfilt')||{}).value||'';
   const q=((document.getElementById('hsrch')||{}).value||'').toLowerCase();
@@ -626,7 +665,7 @@ function renderHist(){
   const el=document.getElementById('hist-list');
   if(!items.length){el.innerHTML='<div style="text-align:center;padding:2rem;color:var(--text2)">No activity found.</div>';return;}
   const ic={sale:'ti-shopping-cart',restock:'ti-package-import',po:'ti-file-invoice',alert:'ti-brand-whatsapp'};
-  el.innerHTML=items.map(h=>`<div class="hist-row">
+  el.innerHTML=items.map((h,idx)=>`<div class="hist-row">
     <div class="hico ${h.type}"><i class="ti ${ic[h.type]||'ti-clock'}" style="font-size:13px"></i></div>
     <div style="flex:1"><div style="font-size:13px;font-weight:500">${h.name}${h.sku?` <span style="font-size:11px;color:var(--text2);font-family:var(--mono)">${h.sku}</span>`:''}</div>
     <div style="font-size:11px;color:var(--text2);margin-top:2px">${[h.size?'Size '+h.size:'',h.color||'',h.qty?h.qty+' units':'',h.date||''].filter(Boolean).join(' · ')}</div></div>
@@ -800,7 +839,7 @@ async function checkAndAlert(item,action,qty){
 
 // ─── Tab switching ────────────────────────────────────────────
 function sw(t){
-  ['inventory','catalogue','analytics','history','alerts','orders','whatsapp'].forEach(x=>{
+  ['inventory','catalogue','analytics','history','alerts','orders','whatsapp','finance','cusorders'].forEach(x=>{
     document.getElementById('v-'+x).style.display=x===t?'block':'none';
     document.getElementById('tab-'+x).classList.toggle('on',x===t);
   });
@@ -809,6 +848,13 @@ function sw(t){
   if(t==='orders')renderOrders();
   if(t==='analytics')setTimeout(renderAnalytics,80);
   if(t==='catalogue')renderCat();
+  if(t==='finance'){
+    loadFinances();
+    updateFinCats();
+    const d=document.getElementById('fin-date');
+    if(d&&!d.value)d.value=new Date().toISOString().split('T')[0];
+    renderFinance();
+  }
   if(t==='whatsapp'){
     const pe=document.getElementById('wa-phone');const ke=document.getElementById('wa-apikey');
     if(pe)pe.value=waConfig.phone;if(ke)ke.value=waConfig.apikey;
@@ -904,6 +950,20 @@ function confirmDel(id){
 
 function delItem(id){inv=inv.filter(i=>i.id!==id);closeModal();lsSave();renderAll();toast('Item removed');}
 
+
+function calcDSTotal(unitPrice){
+  const qty = parseInt(document.getElementById('s-qty')?.value)||1;
+  const del = parseFloat(document.getElementById('s-delivery')?.value)||0;
+  const sub = qty * unitPrice;
+  const tot = sub + del;
+  const el1 = document.getElementById('ds-subtot');
+  const el2 = document.getElementById('ds-delfee');
+  const el3 = document.getElementById('ds-tot');
+  if(el1) el1.textContent = fmt(sub);
+  if(el2) el2.textContent = fmt(del);
+  if(el3) el3.textContent = fmt(tot);
+}
+
 function updST(){const sel=document.getElementById('s-item');if(!sel)return;const id=parseInt(sel.value);const qty=parseInt(document.getElementById('s-qty')?.value)||1;const i=inv.find(x=>x.id===id);const el=document.getElementById('s-total');if(el&&i)el.textContent=fmt(i.price*qty);}
 
 function saveItem(id){
@@ -960,13 +1020,345 @@ function renderAll(){renderMetrics();renderTable();renderAlerts();}
 
 // ─── Init ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
+  // Clear old demo data from localStorage on fresh start
+  const savedInv = localStorage.getItem('sm_inv');
+  if(savedInv){
+    try{
+      const parsed = JSON.parse(savedInv);
+      // If it contains demo items like KC-001, wipe it
+      if(parsed.length && parsed[0] && parsed[0].sku && parsed[0].sku && parsed[0].sku.startsWith('KC-')){
+        localStorage.removeItem('sm_inv');
+        localStorage.removeItem('sm_hist');
+        localStorage.removeItem('sm_orders');
+        localStorage.removeItem('sm_notif');
+      }
+    }catch(e){}
+  }
   lsLoad();
   const urlEl=document.getElementById('gs-url');
   if(urlEl&&gsUrl)urlEl.value=gsUrl;
   updateSyncUI();
   renderAll();
+  loadFinances();
+  loadCusOrders();
+  updateCOBadge();
   if(gsUrl)loadFromGS();
 });
+
+const FIN_CATS={income:['Sales revenue','Delivery income','Other income','Refunds received','Investment'],expense:['Supplier payment','Rent','Salaries','Utilities','Delivery cost','Packaging','Marketing','Equipment','Tax','Other expense']};
+let finances=[];
+function loadFinances(){try{finances=JSON.parse(localStorage.getItem('sm_fin')||'[]');}catch(e){finances=[];}}
+function saveFinances(){localStorage.setItem('sm_fin',JSON.stringify(finances));}
+function updateFinCats(){
+  const type=document.getElementById('fin-type')?.value||'income';
+  const sel=document.getElementById('fin-cat');if(!sel)return;
+  sel.innerHTML=FIN_CATS[type].map(c=>`<option>${c}</option>`).join('');
+}
+function addFinRecord(){
+  const type=document.getElementById('fin-type')?.value;
+  const cat=document.getElementById('fin-cat')?.value;
+  const amount=parseFloat(document.getElementById('fin-amount')?.value)||0;
+  const desc=document.getElementById('fin-desc')?.value.trim()||'';
+  const date=document.getElementById('fin-date')?.value||new Date().toISOString().split('T')[0];
+  if(!amount){toast('Enter an amount','err');return;}
+  finances.unshift({id:Date.now(),type,cat,amount,desc,date});
+  saveFinances();
+  document.getElementById('fin-amount').value='';
+  document.getElementById('fin-desc').value='';
+  renderFinance();
+  toast((type==='income'?'Income':'Expense')+' recorded ✓','ok');
+}
+function deleteFinRecord(id){
+  if(!confirm('Delete this record?'))return;
+  finances=finances.filter(f=>f.id!==id);
+  saveFinances();renderFinance();
+  toast('Record deleted','ok');
+}
+function renderFinMetrics(){
+  const el=document.getElementById('fin-metrics');if(!el)return;
+  const now=new Date();const tm=now.getMonth();const ty=now.getFullYear();
+  const mr=finances.filter(f=>{const d=new Date(f.date);return d.getMonth()===tm&&d.getFullYear()===ty;});
+  const ti=finances.filter(f=>f.type==='income').reduce((a,b)=>a+b.amount,0);
+  const te=finances.filter(f=>f.type==='expense').reduce((a,b)=>a+b.amount,0);
+  const mi=mr.filter(f=>f.type==='income').reduce((a,b)=>a+b.amount,0);
+  const me=mr.filter(f=>f.type==='expense').reduce((a,b)=>a+b.amount,0);
+  const profit=ti-te;const mp=mi-me;
+  el.innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Total income</div><div style="font-size:20px;font-weight:600;color:var(--green)">${fmt(ti)}</div><div style="font-size:11px;color:var(--text2)">This month: ${fmt(mi)}</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Total expenses</div><div style="font-size:20px;font-weight:600;color:var(--red)">${fmt(te)}</div><div style="font-size:11px;color:var(--text2)">This month: ${fmt(me)}</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Net profit</div><div style="font-size:20px;font-weight:600;${profit>=0?'color:var(--green)':'color:var(--red)'}">${fmt(profit)}</div><div style="font-size:11px;color:var(--text2)">This month: ${fmt(mp)}</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Records</div><div style="font-size:20px;font-weight:600">${finances.length}</div><div style="font-size:11px;color:var(--text2)">This month: ${mr.length}</div></div>`;
+}
+function renderFinance(){
+  const ftype=document.getElementById('fin-ftype')?.value||'';
+  const fperiod=document.getElementById('fin-fperiod')?.value||'all';
+  const fsrch=(document.getElementById('fin-srch')?.value||'').toLowerCase();
+  const now=new Date();
+  let recs=finances.filter(f=>{
+    if(ftype&&f.type!==ftype)return false;
+    if(fsrch&&!(f.desc+f.cat).toLowerCase().includes(fsrch))return false;
+    if(fperiod!=='all'){
+      const d=new Date(f.date);
+      if(fperiod==='today'&&d.toDateString()!==now.toDateString())return false;
+      if(fperiod==='week'&&d<new Date(now-7*86400000))return false;
+      if(fperiod==='month'&&(d.getMonth()!==now.getMonth()||d.getFullYear()!==now.getFullYear()))return false;
+    }
+    return true;
+  });
+  const el=document.getElementById('fin-list');if(!el)return;
+  if(!recs.length){el.innerHTML='<div style="text-align:center;padding:2rem;color:var(--text2);font-size:13px">No records found. Add your first income or expense above.</div>';renderFinMetrics();return;}
+  el.innerHTML=recs.map(f=>`<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border)">
+    <div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;background:${f.type==='income'?'var(--green-bg)':'var(--red-bg)'};color:${f.type==='income'?'var(--green)':'var(--red)'}"><i class="ti ${f.type==='income'?'ti-arrow-down-left':'ti-arrow-up-right'}"></i></div>
+    <div style="flex:1"><div style="font-size:13px;font-weight:500">${f.desc||f.cat}</div><div style="font-size:11px;color:var(--text2);margin-top:2px"><span style="background:var(--surface2);padding:1px 7px;border-radius:4px;margin-right:6px">${f.cat}</span>${f.date}</div></div>
+    <div style="font-size:14px;font-weight:600;${f.type==='income'?'color:var(--green)':'color:var(--red)'}">${f.type==='income'?'+':'-'}${fmt(f.amount)}</div>
+    <button onclick="deleteFinRecord(${f.id})" style="font-size:11px;padding:4px 10px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:8px">Del</button>
+  </div>`).join('')+`<div style="padding:8px 14px;font-size:11px;color:var(--text2);background:var(--surface2)">
+    ${recs.length} records &nbsp;·&nbsp; Income: <span style="color:var(--green);font-weight:600">${fmt(recs.filter(f=>f.type==='income').reduce((a,b)=>a+b.amount,0))}</span> &nbsp;·&nbsp; Expenses: <span style="color:var(--red);font-weight:600">${fmt(recs.filter(f=>f.type==='expense').reduce((a,b)=>a+b.amount,0))}</span> &nbsp;·&nbsp; Net: <span style="font-weight:600">${fmt(recs.filter(f=>f.type==='income').reduce((a,b)=>a+b.amount,0)-recs.filter(f=>f.type==='expense').reduce((a,b)=>a+b.amount,0))}</span>
+  </div>`;
+  renderFinMetrics();
+}
+
+
+// ── Customer Orders ───────────────────────────────────────────
+let cusOrders = [];
+function loadCusOrders(){ try{ cusOrders=JSON.parse(localStorage.getItem('sm_co')||'[]'); }catch(e){ cusOrders=[]; } }
+function saveCusOrders(){ localStorage.setItem('sm_co', JSON.stringify(cusOrders)); }
+
+function openCOModal(){
+  const itemOptions = inv.map(i=>`<option value="${i.id}">${i.name} (stock: ${i.stock}) - ${fmt(i.price)}</option>`).join('');
+  showModal(`<div class="modal">
+    <div class="mh"><h2 style="display:flex;align-items:center;gap:8px"><i class="ti ti-package"></i> New customer order</h2><button class="abtn" onclick="closeModal()"><i class="ti ti-x"></i></button></div>
+
+    <div style="background:var(--surface2);border-radius:var(--r);padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text2)">
+      <i class="ti ti-info-circle" style="vertical-align:-2px"></i> Order is saved as <b>Pending</b>. Mark as <b>Delivered</b> to auto-record in sales. Mark as <b>Returned</b> if parcel comes back.
+    </div>
+
+    <div class="fg">
+      <div class="fr"><label>Customer name *</label><input id="co-name" placeholder="e.g. Nimal Perera" style="width:100%"/></div>
+      <div class="fr"><label>Phone number</label><input id="co-phone" placeholder="+94771234567 (optional)" style="width:100%"/></div>
+    </div>
+    <div class="fr"><label>Delivery address</label><input id="co-addr" placeholder="Address (optional)" style="width:100%"/></div>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Order items</div>
+      <div id="co-items-wrap">
+        <div class="co-item-row fg3" style="margin-bottom:8px;gap:8px">
+          <select class="co-item-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">${itemOptions}</select>
+          <div style="display:flex;flex-direction:column"><label style="font-size:10px;color:var(--text2);margin-bottom:3px">SIZE</label><select class="co-size-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">${SIZES.map(s=>`<option>${s}</option>`).join('')}</select></div>
+          <div style="display:flex;flex-direction:column"><label style="font-size:10px;color:var(--text2);margin-bottom:3px">QTY</label><input type="number" class="co-qty-inp" min="1" value="1" style="font-size:13px;width:100%"/></div>
+        </div>
+      </div>
+      <button onclick="addCOItemRow()" style="font-size:12px;padding:4px 12px;margin-bottom:4px"><i class="ti ti-plus"></i> Add item</button>
+    </div>
+
+    <div class="fg">
+      <div class="fr"><label>Delivery charge (LKR)</label><input id="co-delivery" type="number" min="0" value="0" oninput="calcCOTotal()" style="width:100%"/></div>
+      <div class="fr"><label>Grand total (LKR)</label><div id="co-total-display" style="height:36px;display:flex;align-items:center;font-size:15px;font-weight:700;color:var(--green)">Rs. 0</div></div>
+    </div>
+    <div class="fr"><label>Notes</label><textarea id="co-notes" rows="2" placeholder="Any special instructions..." style="width:100%"></textarea></div>
+
+    <div class="mf"><button onclick="closeModal()">Cancel</button><button onclick="saveCusOrder()" style="background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:13px;font-weight:600;cursor:pointer"><i class="ti ti-check"></i> Save order</button></div>
+  </div>`);
+  setTimeout(()=>{ setupCOItemListeners(); calcCOTotal(); },80);
+}
+
+function addCOItemRow(){
+  const wrap = document.getElementById('co-items-wrap');
+  if(!wrap) return;
+  const itemOptions = inv.map(i=>`<option value="${i.id}">${i.name} (stock: ${i.stock}) - ${fmt(i.price)}</option>`).join('');
+  const row = document.createElement('div');
+  row.className='co-item-row fg3';
+  row.style.cssText='margin-bottom:8px;gap:8px;display:grid;grid-template-columns:1fr 1fr 1fr';
+  row.innerHTML=`<select class="co-item-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">${itemOptions}</select>
+    <div style="display:flex;flex-direction:column"><label style="font-size:10px;color:var(--text2);margin-bottom:3px">SIZE</label><select class="co-size-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">${SIZES.map(s=>`<option>${s}</option>`).join('')}</select></div>
+    <div style="display:flex;flex-direction:column"><label style="font-size:10px;color:var(--text2);margin-bottom:3px">QTY</label><input type="number" class="co-qty-inp" min="1" value="1" oninput="calcCOTotal()" style="font-size:13px;width:100%;border:1px solid var(--border2);border-radius:var(--r);padding:7px 10px"/></div>`;
+  wrap.appendChild(row);
+  setupCOItemListeners();
+  calcCOTotal();
+}
+
+function setupCOItemListeners(){
+  document.querySelectorAll('.co-item-sel,.co-qty-inp').forEach(el=>{ el.oninput=calcCOTotal; });
+}
+
+function calcCOTotal(){
+  let sub=0;
+  const rows=document.querySelectorAll('.co-item-row');
+  rows.forEach(row=>{
+    const sel=row.querySelector('.co-item-sel');
+    const qty=parseInt(row.querySelector('.co-qty-inp')?.value)||1;
+    if(sel){const item=inv.find(i=>i.id===parseInt(sel.value));if(item)sub+=item.price*qty;}
+  });
+  const del=parseFloat(document.getElementById('co-delivery')?.value)||0;
+  const tot=sub+del;
+  const el=document.getElementById('co-total-display');
+  if(el) el.textContent=fmt(tot);
+}
+
+function saveCusOrder(){
+  const name=document.getElementById('co-name')?.value.trim();
+  if(!name){toast('Customer name is required','err');return;}
+  const phone=document.getElementById('co-phone')?.value.trim()||'';
+  const addr=document.getElementById('co-addr')?.value.trim()||'';
+  const notes=document.getElementById('co-notes')?.value.trim()||'';
+  const del=parseFloat(document.getElementById('co-delivery')?.value)||0;
+
+  const items=[];
+  document.querySelectorAll('.co-item-row').forEach(row=>{
+    const sel=row.querySelector('.co-item-sel');
+    const sizeSel=row.querySelector('.co-size-sel');
+    const qty=parseInt(row.querySelector('.co-qty-inp')?.value)||1;
+    if(sel){
+      const item=inv.find(i=>i.id===parseInt(sel.value));
+      if(item) items.push({itemId:item.id,name:item.name,sku:item.sku,price:item.price,qty,size:sizeSel?.value||'',total:item.price*qty});
+    }
+  });
+  if(!items.length){toast('Add at least one item','err');return;}
+
+  const subTotal=items.reduce((a,b)=>a+b.total,0);
+  const grandTotal=subTotal+del;
+  const now=new Date();
+  const orderId='ORD-'+String(Date.now()).slice(-6);
+
+  cusOrders.unshift({
+    id:orderId, customer:name, phone, address:addr, notes,
+    items, delivery:del, subTotal, grandTotal,
+    status:'pending',
+    date:now.toLocaleDateString('en-LK'),
+    time:now.toLocaleTimeString('en-LK')
+  });
+  saveCusOrders();
+  closeModal();
+  renderCusOrders();
+  renderCOMetrics();
+  updateCOBadge();
+  toast(`Order ${orderId} saved for ${name} ✓`,'ok');
+}
+
+function markCODelivered(id){
+  const o=cusOrders.find(x=>x.id===id);if(!o)return;
+  if(!confirm(`Mark order ${id} as DELIVERED?\n\nThis will automatically record the sale and reduce stock for all items.`))return;
+
+  o.status='delivered';
+  o.deliveredDate=new Date().toLocaleDateString('en-LK');
+
+  // Auto-record in sales history and reduce stock
+  o.items.forEach(oi=>{
+    const item=inv.find(i=>i.id===oi.itemId);
+    if(item){
+      item.stock=Math.max(0,item.stock-oi.qty);
+      item.sold=(item.sold||0)+oi.qty;
+      history.unshift({type:'sale',name:item.name,sku:item.sku,qty:oi.qty,size:oi.size,color:'',total:oi.total,delivery:0,date:'Just now ('+o.customer+')'});
+    }
+  });
+  // Record delivery income in finance
+  if(o.delivery>0){
+    loadFinances();
+    finances.unshift({id:Date.now(),type:'income',cat:'Delivery income',amount:o.delivery,desc:'Delivery: Order '+id+' ('+o.customer+')',date:new Date().toISOString().split('T')[0]});
+    saveFinances();
+  }
+  // Record sale income in finance
+  loadFinances();
+  finances.unshift({id:Date.now()+1,type:'income',cat:'Sales revenue',amount:o.subTotal,desc:'Sale: Order '+id+' ('+o.customer+')',date:new Date().toISOString().split('T')[0]});
+  saveFinances();
+
+  lsSave();saveCusOrders();
+  renderAll();renderCusOrders();renderCOMetrics();updateCOBadge();
+  toast('Order marked delivered & sale recorded ✓','ok');
+}
+
+function markCOReturned(id){
+  const o=cusOrders.find(x=>x.id===id);if(!o)return;
+  if(!confirm(`Mark order ${id} as RETURNED?\n\nStock will NOT be affected. The order will be marked as returned.`))return;
+  o.status='returned';
+  o.returnedDate=new Date().toLocaleDateString('en-LK');
+  saveCusOrders();renderCusOrders();renderCOMetrics();updateCOBadge();
+  toast('Order marked as returned','ok');
+}
+
+function deleteCusOrder(id){
+  if(!confirm('Delete this order? This cannot be undone.'))return;
+  cusOrders=cusOrders.filter(x=>x.id!==id);
+  saveCusOrders();renderCusOrders();renderCOMetrics();updateCOBadge();
+  toast('Order deleted','ok');
+}
+
+function updateCOBadge(){
+  const pending=cusOrders.filter(o=>o.status==='pending').length;
+  const b=document.getElementById('co-badge');
+  if(b){b.textContent=pending;b.style.display=pending>0?'inline':'none';}
+}
+
+function renderCOMetrics(){
+  const el=document.getElementById('co-metrics');if(!el)return;
+  const total=cusOrders.length;
+  const pending=cusOrders.filter(o=>o.status==='pending').length;
+  const delivered=cusOrders.filter(o=>o.status==='delivered').length;
+  const returned=cusOrders.filter(o=>o.status==='returned').length;
+  const revenue=cusOrders.filter(o=>o.status==='delivered').reduce((a,b)=>a+b.grandTotal,0);
+  el.innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Total orders</div><div style="font-size:22px;font-weight:600">${total}</div><div style="font-size:11px;color:var(--text2)">${pending} pending</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Delivered</div><div style="font-size:22px;font-weight:600;color:var(--green)">${delivered}</div><div style="font-size:11px;color:var(--text2)">successfully</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Returned</div><div style="font-size:22px;font-weight:600;color:var(--red)">${returned}</div><div style="font-size:11px;color:var(--text2)">parcels</div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Revenue</div><div style="font-size:18px;font-weight:600;color:var(--green)">${fmt(revenue)}</div><div style="font-size:11px;color:var(--text2)">from delivered</div></div>`;
+}
+
+function renderCusOrders(){
+  const fstatus=document.getElementById('co-fstatus')?.value||'';
+  const srch=(document.getElementById('co-srch')?.value||'').toLowerCase();
+  let recs=cusOrders.filter(o=>{
+    if(fstatus&&o.status!==fstatus)return false;
+    if(srch&&!(o.customer+o.phone+o.id).toLowerCase().includes(srch))return false;
+    return true;
+  });
+  const el=document.getElementById('co-list');if(!el)return;
+  if(!recs.length){
+    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)"><i class="ti ti-package" style="font-size:28px;display:block;margin-bottom:8px"></i>No orders yet. Click "New customer order" to get started.</div>';
+    renderCOMetrics();return;
+  }
+  const statusStyles={
+    pending:{bg:'var(--amber-bg)',color:'var(--amber)',label:'⏳ Pending'},
+    delivered:{bg:'var(--green-bg)',color:'var(--green)',label:'✅ Delivered'},
+    returned:{bg:'var(--red-bg)',color:'var(--red)',label:'↩ Returned'}
+  };
+  el.innerHTML=recs.map(o=>{
+    const s=statusStyles[o.status]||statusStyles.pending;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <span style="font-size:14px;font-weight:700">${o.customer}</span>
+            <span style="font-family:monospace;font-size:11px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px">${o.id}</span>
+            <span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;background:${s.bg};color:${s.color}">${s.label}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2)">${o.phone?'📞 '+o.phone:''} ${o.address?'&nbsp;📍 '+o.address:''}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${o.date} ${o.time}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700;color:var(--green)">${fmt(o.grandTotal)}</div>
+          ${o.delivery>0?`<div style="font-size:11px;color:var(--text2)">incl. delivery ${fmt(o.delivery)}</div>`:''}
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--r);padding:10px;margin-bottom:10px">
+        ${o.items.map(it=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>${it.name} ${it.size?'('+it.size+')':''} ×${it.qty}</span><span style="font-weight:600">${fmt(it.total)}</span></div>`).join('')}
+        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px"><span>Subtotal</span><span>${fmt(o.subTotal)}</span></div>
+        ${o.delivery>0?`<div style="display:flex;justify-content:space-between;font-size:12px"><span>Delivery</span><span>${fmt(o.delivery)}</span></div>`:''}
+      </div>
+      ${o.notes?`<div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-style:italic">📝 ${o.notes}</div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${o.status==='pending'?`
+          <button onclick="markCODelivered('${o.id}')" style="font-size:12px;padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">✅ Mark delivered</button>
+          <button onclick="markCOReturned('${o.id}')" style="font-size:12px;padding:6px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600">↩ Mark returned</button>
+        `:''}
+        ${o.status==='delivered'?`<div style="font-size:12px;color:var(--green);padding:6px 0">✅ Delivered on ${o.deliveredDate||o.date} — sale recorded automatically</div>`:''}
+        ${o.status==='returned'?`<div style="font-size:12px;color:var(--red);padding:6px 0">↩ Returned on ${o.returnedDate||o.date}</div>`:''}
+        <button onclick="deleteCusOrder('${o.id}')" style="font-size:12px;padding:6px 12px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto">🗑 Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+  renderCOMetrics();
+}
+
 </script>
 </body>
 </html>
