@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<meta name="apple-mobile-web-app-title" content="StockMate"/>
-<title>StockMate — Kids' Clothing</title>
+<meta name="apple-mobile-web-app-title" content="Edgex Stock"/>
+<title>Edgex Stock Management</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet"/>
@@ -61,7 +61,10 @@
   }
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;position:relative}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:linear-gradient(135deg,#1a0533 0%,#0d1b3e 25%,#0a2744 50%,#1a0533 75%,#2d0b4e 100%);background-size:400% 400%;animation:bgshift 12s ease infinite}
+@keyframes bgshift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.app{position:relative;z-index:1}
 button{font-family:var(--font);cursor:pointer;font-size:13px;border:1px solid var(--border2);background:var(--surface);color:var(--text);border-radius:var(--r);padding:6px 14px;transition:background .15s,opacity .15s}
 button:hover{background:var(--surface2)}
 button:active{opacity:.8;transform:scale(.98)}
@@ -70,9 +73,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 textarea{resize:vertical}
 .app{max-width:1200px;margin:0 auto;padding:16px}
 /* Header */
-.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding:14px 16px;border-radius:var(--r2);background:rgba(255,255,255,0.06);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.12);flex-wrap:wrap;gap:10px}
 .hdr-brand{display:flex;align-items:center;gap:10px}
-.hdr-logo{width:36px;height:36px;background:var(--accent);border-radius:var(--r);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0}
+.hdr-logo{width:36px;height:36px;background:linear-gradient(135deg,#f953c6,#b91d73);border-radius:var(--r);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0;box-shadow:0 2px 12px rgba(249,83,198,.4)}
 .hdr-title{font-size:16px;font-weight:600;color:var(--text)}
 .hdr-sub{font-size:11px;color:var(--text3);margin-top:1px}
 .hdr-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -201,7 +204,7 @@ tr:hover td{background:var(--surface2)}
   <div class="hdr-brand">
     <div class="hdr-logo"><i class="ti ti-shirt"></i></div>
     <div>
-      <div class="hdr-title">StockMate</div>
+      <div class="hdr-title" style="font-size:17px;font-weight:700;background:linear-gradient(90deg,#f953c6,#b91d73,#f953c6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Edgex Stock Management</div>
       <div class="hdr-sub">Kids' Clothing · LKR</div>
     </div>
   </div>
@@ -722,6 +725,9 @@ function getAnSales(){
 }
 
 function renderAnalytics(){
+  // Show empty state if no inventory
+  const noData = inv.length === 0;
+
   // Period summary
   const periodSales = getAnSales ? getAnSales() : history.filter(h=>h.type==='sale');
   const periodRev = periodSales.reduce((a,b)=>a+(b.total||0),0);
@@ -749,17 +755,39 @@ function renderAnalytics(){
   const cats=[...new Set(inv.map(i=>i.cat))];
   const ct=cats.map(c=>({cat:c,total:inv.filter(i=>i.cat===c).reduce((a,b)=>a+b.stock,0)})).sort((a,b)=>b.total-a.total);
   const mc=ct[0]?.total||1;
-  document.getElementById('cat-bars').innerHTML=ct.map((c,i)=>`<div class="catrow"><div style="font-size:12px;width:85px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.cat}</div><div class="cattrack"><div class="catfill" style="width:${Math.round(c.total/mc*100)}%;background:${ACOLORS[i%ACOLORS.length]}"></div></div><div style="font-size:12px;font-weight:600;margin-left:8px;color:var(--text2)">${c.total}</div></div>`).join('');
+  const catBarsEl=document.getElementById('cat-bars');
+  if(!catBarsEl) return;
+  if(noData){catBarsEl.innerHTML='<div style="color:var(--text2);font-size:13px;padding:1rem 0;text-align:center">No inventory data yet</div>';document.getElementById('top-val').innerHTML='';document.getElementById('mlist').innerHTML='';return;}
+  catBarsEl.innerHTML=ct.map((c,i)=>`<div class="catrow"><div style="font-size:12px;width:85px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.cat}</div><div class="cattrack"><div class="catfill" style="width:${Math.round(c.total/mc*100)}%;background:${ACOLORS[i%ACOLORS.length]}"></div></div><div style="font-size:12px;font-weight:600;margin-left:8px;color:var(--text2)">${c.total}</div></div>`).join('');
   const tv=[...inv].sort((a,b)=>(b.stock*b.price)-(a.stock*a.price)).slice(0,5);
   const mv=(tv[0]?.stock*tv[0]?.price)||1;
   document.getElementById('top-val').innerHTML=tv.map(i=>`<div class="catrow"><div style="font-size:12px;width:95px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i.name}</div><div class="cattrack"><div class="catfill" style="width:${Math.round(i.stock*i.price/mv*100)}%;background:#7F77DD"></div></div><div style="font-size:11px;margin-left:8px;color:var(--text2);white-space:nowrap">${fmt(i.stock*i.price)}</div></div>`).join('');
-  if(charts.s)charts.s.destroy();
-  charts.s=new Chart(document.getElementById('schart'),{type:'bar',data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[{label:'Units',data:[6,9,4,11,8,14,7],backgroundColor:'#378ADD',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{beginAtZero:true,grid:{color:'rgba(128,128,128,.1)'},ticks:{font:{size:11}}}}}});
+  // Real sales data from history
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const salesData=days.map(()=>0); // placeholder - will be real when sales exist
+  history.filter(h=>h.type==='sale').slice(0,7).forEach((h,i)=>{ if(i<7) salesData[i]=(h.qty||0); });
+
+  const chartEl=document.getElementById('schart');
+  if(!chartEl) return;
+
+  if(noData || !history.filter(h=>h.type==='sale').length){
+    chartEl.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:170px;color:var(--text2);font-size:13px;flex-direction:column;gap:8px"><i class="ti ti-chart-bar" style="font-size:32px;opacity:.3"></i><span>No sales data yet — add items and record sales to see your chart</span></div>';
+  } else {
+    if(charts.s)charts.s.destroy();
+    charts.s=new Chart(chartEl,{type:'bar',data:{labels:days,datasets:[{label:'Units',data:salesData,backgroundColor:'#f953c6',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.5)'}},y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.08)'},ticks:{font:{size:11},color:'rgba(255,255,255,.5)'}}}}});
+  }
   const sRev=history.filter(h=>h.type==='sale').reduce((a,b)=>a+(b.total||0),0);
   const sCost=history.filter(h=>h.type==='restock').reduce((a,b)=>a+(b.total||0),0);
   const sVal=inv.reduce((a,b)=>a+(b.stock*b.cost),0);
-  if(charts.r)charts.r.destroy();
-  charts.r=new Chart(document.getElementById('rchart'),{type:'bar',data:{labels:['Revenue','COGS','Stock cost'],datasets:[{data:[sRev,sCost,sVal],backgroundColor:['#1D9E75','#E24B4A','#378ADD'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(128,128,128,.1)'},ticks:{font:{size:10},callback:v=>'Rs.'+Math.round(v/1000)+'k'}},y:{grid:{display:false},ticks:{font:{size:11}}}}}});
+  const rchartEl=document.getElementById('rchart');
+  if(rchartEl){
+    if(!sRev&&!sCost&&!sVal){
+      rchartEl.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:140px;color:var(--text2);font-size:13px">No financial data yet</div>';
+    } else {
+      if(charts.r)charts.r.destroy();
+      charts.r=new Chart(rchartEl,{type:'bar',data:{labels:['Revenue','COGS','Stock cost'],datasets:[{data:[sRev,sCost,sVal],backgroundColor:['#1D9E75','#f953c6','#7F77DD'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.08)'},ticks:{font:{size:10},color:'rgba(255,255,255,.5)',callback:v=>'Rs.'+Math.round(v/1000)+'k'}},y:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.5)'}}}}});
+    }
+  }
   const margins=[...inv].sort((a,b)=>((b.price-b.cost)/b.price)-((a.price-a.cost)/a.price)).slice(0,5);
   document.getElementById('mlist').innerHTML=margins.map(i=>{const m=Math.round((i.price-i.cost)/i.price*100);return`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">${i.name}</span><span style="font-weight:600;color:${m>=50?'var(--green)':m>=30?'var(--amber)':'var(--red)'}">${m}%</span></div>`}).join('');
 }
