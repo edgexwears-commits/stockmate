@@ -209,6 +209,8 @@ tr:hover td{background:var(--surface2)}
     </div>
   </div>
   <div class="hdr-actions">
+    <button onclick="exportToExcel()" style="font-size:13px;padding:6px 14px;display:flex;align-items:center;gap:5px;background:#1d7a4f;color:#fff;border:none;border-radius:var(--r);cursor:pointer"><i class="ti ti-file-spreadsheet"></i> Export Excel</button>
+    <button onclick="clearAllData()" style="font-size:13px;padding:6px 14px;display:flex;align-items:center;gap:5px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:var(--r);cursor:pointer"><i class="ti ti-trash"></i> Clear data</button>
     <button onclick="sw('whatsapp')" style="color:var(--wa);border-color:var(--wa)"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>
     <button onclick="openModal('sale_bulk')"><i class="ti ti-shopping-cart"></i> Sale</button>
     <button class="btn-primary" onclick="openModal('add')"><i class="ti ti-plus"></i> Add item</button>
@@ -239,6 +241,7 @@ tr:hover td{background:var(--surface2)}
   <button class="tab" onclick="sw('whatsapp')" id="tab-whatsapp"><i class="ti ti-brand-whatsapp" style="font-size:13px"></i>WhatsApp</button>
   <button class="tab" onclick="sw('finance')" id="tab-finance"><i class="ti ti-cash" style="font-size:13px"></i>Finance</button>
   <button class="tab" onclick="sw('cusorders')" id="tab-cusorders"><i class="ti ti-package" style="font-size:13px"></i>Customer Orders <span class="tbadge" id="co-badge" style="display:none">0</span></button>
+  <button class="tab" onclick="sw('wholesale')" id="tab-wholesale"><i class="ti ti-building-store" style="font-size:13px"></i>Wholesale</button>
 </div>
 
 <!-- Inventory -->
@@ -347,6 +350,14 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div style="font-size:11px;color:var(--text2);padding:10px;background:var(--surface2);border-radius:var(--r)"><i class="ti ti-info-circle" style="vertical-align:-2px"></i> Free plan: ~50 messages/day via CallMeBot. Alerts fire automatically on every sale.</div>
   </div>
+
+  <!-- Danger Zone -->
+  <div style="background:var(--red-bg);border:1px solid var(--red);border-radius:var(--r2);padding:16px;margin-top:16px;margin-bottom:16px">
+    <div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:8px"><i class="ti ti-alert-triangle"></i> Danger zone</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Permanently delete all inventory, sales, orders, finance records and history. This cannot be undone.</div>
+    <button onclick="clearAllData()" style="font-size:13px;padding:8px 20px;background:var(--red);color:#fff;border:none;border-radius:var(--r);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px"><i class="ti ti-trash"></i> Clear all data</button>
+  </div>
+
   <div class="slabel">Notification log</div>
   <div class="nlog" id="notif-log"><div style="padding:20px;text-align:center;color:var(--text2);font-size:13px">No notifications sent yet.</div></div>
 </div>
@@ -399,6 +410,29 @@ tr:hover td{background:var(--surface2)}
   <div id="co-list"></div>
 </div>
 
+
+<div id="v-wholesale" style="display:none">
+  <!-- Summary metrics -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px" id="ws-metrics"></div>
+
+  <!-- New wholesale order button -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+    <button onclick="openWSModal()" style="background:linear-gradient(135deg,#f953c6,#b91d73);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px"><i class="ti ti-building-store"></i> New wholesale order</button>
+  </div>
+
+  <!-- Filter -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <select id="ws-fstatus" onchange="renderWholesale()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text)">
+      <option value="">All orders</option>
+      <option value="pending">Pending</option>
+      <option value="delivered">Delivered</option>
+      <option value="returned">Returned</option>
+    </select>
+    <input type="text" id="ws-srch" placeholder="Search buyer, phone..." oninput="renderWholesale()" style="flex:1;min-width:140px;font-size:13px;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface);color:var(--text)"/>
+  </div>
+  <div id="ws-list"></div>
+</div>
+
 </div><!-- .app -->
 
 <!-- Toast container -->
@@ -423,29 +457,27 @@ const charts={};
 // ─── LocalStorage helpers ────────────────────────────────────
 function lsLoad(){
   try{
-    const rawInv=localStorage.getItem('sm_inv');
-    inv=rawInv?JSON.parse(rawInv):[];
-    const rawHist=localStorage.getItem('sm_hist');
-    history=rawHist?JSON.parse(rawHist):[];
-    const rawOrders=localStorage.getItem('sm_orders');
-    orders=rawOrders?JSON.parse(rawOrders):[];
-    const rawNotif=localStorage.getItem('sm_notif');
-    notifLog=rawNotif?JSON.parse(rawNotif):[];
-    const rawWA=localStorage.getItem('sm_wa');
-    if(rawWA)waConfig=JSON.parse(rawWA);
+    inv=JSON.parse(localStorage.getItem('sm_inv')||'[]');
+    history=JSON.parse(localStorage.getItem('sm_hist')||'[]');
+    orders=JSON.parse(localStorage.getItem('sm_orders')||'[]');
+    notifLog=JSON.parse(localStorage.getItem('sm_notif')||'[]');
+    var rawWA=localStorage.getItem('sm_wa');
+    if(rawWA) waConfig=JSON.parse(rawWA);
     gsUrl=localStorage.getItem('sm_gsurl')||'';
-    nextId=inv.length?Math.max(...inv.map(i=>parseInt(i.id)||0))+1:1;
-    nextPO=orders.length?Math.max(...orders.map(o=>parseInt((o.id||'').replace('PO-',''))||0))+1:1;
-  }catch(e){console.error('Load error:',e);}
+    nextId=inv.length?Math.max.apply(null,inv.map(function(i){return parseInt(i.id)||0;}))+1:1;
+    nextPO=orders.length?Math.max.apply(null,orders.map(function(o){return parseInt((o.id||'').replace('PO-',''))||0;}))+1:1;
+  }catch(e){ console.error('lsLoad error:',e); }
 }
 
 function lsSave(){
-  localStorage.setItem('sm_inv', JSON.stringify(inv));
-  localStorage.setItem('sm_hist', JSON.stringify(history));
-  localStorage.setItem('sm_orders', JSON.stringify(orders));
-  localStorage.setItem('sm_notif', JSON.stringify(notifLog));
-  localStorage.setItem('sm_wa', JSON.stringify(waConfig));
-  scheduleGSSync();
+  try{
+    localStorage.setItem('sm_inv', JSON.stringify(inv));
+    localStorage.setItem('sm_hist', JSON.stringify(history));
+    localStorage.setItem('sm_orders', JSON.stringify(orders));
+    localStorage.setItem('sm_notif', JSON.stringify(notifLog));
+    localStorage.setItem('sm_wa', JSON.stringify(waConfig));
+    scheduleGSSync();
+  }catch(e){ console.error('lsSave error:',e); toast('Save error - storage may be full','err'); }
 }
 
 function saveGSUrl(){
@@ -525,9 +557,7 @@ async function loadFromGS(){
 }
 
 // ─── Demo data ───────────────────────────────────────────────
-function loadDemoData(){
-  inv=[];history=[];orders=[];nextId=1;nextPO=1;
-}
+
 
 // ─── Toast ────────────────────────────────────────────────────
 function toast(msg, type=''){
@@ -595,6 +625,7 @@ function renderTable(){
     <td style="font-weight:500;${i.stock===0?'color:var(--red)':i.stock<=i.low?'color:var(--amber)':''}">${i.stock}</td>
     <td style="font-size:12px;color:var(--text2)">${fmt(i.cost)}</td>
     <td style="font-size:12px;font-weight:500">${fmt(i.price)}</td>
+    <td style="font-size:12px;color:#f953c6;font-weight:500">${i.wholesale?fmt(i.wholesale):'-'}</td>
     <td>${stockBadge(i)}</td>
     <td style="padding:6px 8px;white-space:nowrap"><button onclick="confirmDel(${i.id})" style="font-size:13px;padding:6px 12px;background:#c0392b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:5px">🗑 Delete</button><button onclick="openEdit(${i.id})" style="font-size:13px;padding:6px 12px;background:#1a5fa8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">✏️ Edit</button></td>
   </tr>`).join('');
@@ -921,7 +952,7 @@ async function checkAndAlert(item,action,qty){
 
 // ─── Tab switching ────────────────────────────────────────────
 function sw(t){
-  ['inventory','catalogue','analytics','history','alerts','whatsapp','finance','cusorders'].forEach(function(x){
+  ['inventory','catalogue','analytics','history','alerts','whatsapp','finance','cusorders','wholesale'].forEach(function(x){
     var el=document.getElementById('v-'+x);
     var tab=document.getElementById('tab-'+x);
     if(el) el.style.display=(x===t?'block':'none');
@@ -933,6 +964,7 @@ function sw(t){
   if(t==='catalogue') renderCat();
   if(t==='finance'){ loadFinances(); updateFinCats(); var fd=document.getElementById('fin-date'); if(fd&&!fd.value) fd.value=new Date().toISOString().split('T')[0]; renderFinance(); }
   if(t==='cusorders'){ loadCusOrders(); renderCusOrders(); renderCOMetrics(); updateCOBadge(); }
+  if(t==='wholesale'){ loadWSOrders(); renderWholesale(); renderWSMetrics(); }
   if(t==='whatsapp'){
     var pe=document.getElementById('wa-phone'); var ke=document.getElementById('wa-apikey');
     if(pe&&waConfig.phone) pe.value=waConfig.phone;
@@ -966,6 +998,7 @@ function itemFormHTML(item){
     <div class="fg"><div class="fr"><label>Item name</label><input id="m-name" value="${item?item.name:''}"/></div><div class="fr"><label>SKU</label><input id="m-sku" value="${item?item.sku:'KC-00'+nextId}" ${item?'readonly style="color:var(--text2)"':''}/></div></div>
     <div class="fg3"><div class="fr"><label>Category</label><select id="m-cat">${CATS.map(c=>`<option ${item&&item.cat===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="fr"><label>Gender</label><select id="m-gen">${GENDERS.map(g=>`<option ${item&&item.gender===g?'selected':''}>${g}</option>`).join('')}</select></div><div class="fr"><label>Stock qty</label><input id="m-stock" type="number" min="0" value="${item?item.stock:0}"/></div></div>
     <div class="fg"><div class="fr"><label>Cost (LKR)</label><input id="m-cost" type="number" min="0" value="${item?item.cost:''}" oninput="updMargin()"/></div><div class="fr"><label>Price (LKR)</label><input id="m-price" type="number" min="0" value="${item?item.price:''}" oninput="updMargin()"/></div></div>
+    <div class="fg"><div class="fr"><label style="color:#f953c6">Wholesale price (LKR)</label><input id="m-wholesale" type="number" min="0" value="${item?item.wholesale||'':''}" placeholder="Bulk/wholesale price" style="border-color:#f953c6"/></div><div class="fr"><label>Min. wholesale qty</label><input id="m-wsqty" type="number" min="1" value="${item?item.wsqty||3:3}" placeholder="Min qty"/></div></div>
     <div class="fg"><div class="fr"><label>Low stock alert</label><input id="m-low" type="number" min="1" value="${item?item.low:5}"/></div><div class="fr"><label>Margin</label><div id="mpreview" style="height:36px;display:flex;align-items:center;font-size:13px;color:var(--text2)">—</div></div></div>
     <div class="fr"><label>Sizes</label><div class="chips">${SIZES.map(s=>`<button type="button" class="chip${selSizes.includes(s)?' on':''}" id="sz-${s.replace(/ /g,'-')}" onclick="tSz('${s}')">${s}</button>`).join('')}</div></div>
     <div class="fr"><label>Colors</label><div class="chips">${Object.keys(COLS).map(c=>`<button type="button" class="chip${selColors.includes(c)?' on':''}" id="cl-${c}" onclick="tCl('${c}')" style="${selColors.includes(c)?`background:${COLS[c]};color:#fff;border-color:${COLS[c]}`:''}">${c}</button>`).join('')}</div></div>
@@ -1078,7 +1111,7 @@ function updST(){const sel=document.getElementById('s-item');if(!sel)return;cons
 function saveItem(id){
   const name=document.getElementById('m-name')?.value.trim();if(!name)return;
   const photo=pendingPhoto!==null?pendingPhoto:(id?inv.find(i=>i.id===id)?.photo:null);
-  const obj={name,sku:document.getElementById('m-sku')?.value.trim()||'',cat:document.getElementById('m-cat')?.value,gender:document.getElementById('m-gen')?.value,stock:parseInt(document.getElementById('m-stock')?.value)||0,cost:parseFloat(document.getElementById('m-cost')?.value)||0,price:parseFloat(document.getElementById('m-price')?.value)||0,low:parseInt(document.getElementById('m-low')?.value)||5,sizes:selSizes.length?selSizes:['One Size'],colors:selColors.length?selColors:['White'],photo};
+  const obj={name,sku:document.getElementById('m-sku')?.value.trim()||'',cat:document.getElementById('m-cat')?.value,gender:document.getElementById('m-gen')?.value,stock:parseInt(document.getElementById('m-stock')?.value)||0,cost:parseFloat(document.getElementById('m-cost')?.value)||0,price:parseFloat(document.getElementById('m-price')?.value)||0,wholesale:parseFloat(document.getElementById('m-wholesale')?.value)||0,wsqty:parseInt(document.getElementById('m-wsqty')?.value)||3,low:parseInt(document.getElementById('m-low')?.value)||5,sizes:selSizes.length?selSizes:['One Size'],colors:selColors.length?selColors:['White'],photo};
   if(id){const i=inv.find(x=>x.id===id);Object.assign(i,obj,{id,sold:i.sold||0});}
   else{inv.push({...obj,id:nextId++,sold:0});}
   closeModal();lsSave();renderAll();toast('Item saved ✓','ok');
@@ -1144,7 +1177,6 @@ function renderAll(){renderMetrics();renderTable();renderAlerts();}
 
 // ─── Init ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
-  // Data is preserved in localStorage across refreshes
   lsLoad();
   const urlEl=document.getElementById('gs-url');
   if(urlEl&&gsUrl)urlEl.value=gsUrl;
@@ -1153,6 +1185,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadFinances();
   loadCusOrders();
   updateCOBadge();
+  loadWSOrders();
   if(gsUrl)loadFromGS();
 });
 
@@ -1393,130 +1426,663 @@ function renderCOMetrics(){
 
 
 function coDo_deliver(id){
-  var o=null;
-  for(var i=0;i<cusOrders.length;i++){ if(cusOrders[i].id===id){o=cusOrders[i];break;} }
+  console.log('coDo_deliver called with:', id);
+  var o = null;
+  for(var i=0;i<cusOrders.length;i++){
+    if(String(cusOrders[i].id)===String(id)){ o=cusOrders[i]; break; }
+  }
   if(!o){ alert('Order not found: '+id); return; }
   if(o.status==='delivered'){ alert('Already delivered'); return; }
-  if(!confirm('Mark order '+id+' for '+o.customer+' as DELIVERED?\n\nThis will:\n- Record the sale automatically\n- Reduce stock for all items\n- Add to Finance')) return;
+  if(!confirm('Mark order '+id+' for '+o.customer+' as DELIVERED?\n\nThis will:\n- Record the sale\n- Reduce stock\n- Add to Finance')) return;
+  o.status = 'delivered';
+  o.deliveredDate = new Date().toLocaleDateString('en-LK');
+  var items = o.items || [];
+  for(var ii=0; ii<items.length; ii++){
+    var oi = items[ii];
+    var item = null;
+    for(var j=0;j<inv.length;j++){
+      if(inv[j].id===oi.itemId){ item=inv[j]; break; }
+    }
+    if(item){
+      item.stock = Math.max(0, item.stock - (oi.qty||1));
+      item.sold = (item.sold||0) + (oi.qty||1);
+      history.unshift({type:'sale',name:item.name,sku:item.sku,qty:oi.qty||1,size:oi.size||'',color:'',total:oi.total||0,netRevenue:oi.total||0,date:'Delivered ('+o.customer+')'});
+    }
+  }
+  loadFinances();
+  var d = new Date().toISOString().split('T')[0];
+  finances.unshift({id:Date.now(),   type:'income',  cat:'Sales revenue', amount:o.subTotal||0, desc:'Order '+id+' - '+o.customer, date:d});
+  if((o.delivery||0)>0)   finances.unshift({id:Date.now()+1, type:'income',  cat:'Delivery income', amount:o.delivery,   desc:'Delivery Order '+id, date:d});
+  if((o.myDelivery||0)>0) finances.unshift({id:Date.now()+2, type:'expense', cat:'Delivery cost',   amount:o.myDelivery, desc:'Courier Order '+id,   date:d});
+  saveFinances();
+  lsSave();
+  saveCusOrders();
+  renderAll();
+  renderCusOrders();
+  renderCOMetrics();
+  updateCOBadge();
+  toast('Order delivered! Sale recorded automatically.','ok');
+}
+
+function coDo_return(id){
+  console.log('coDo_return called with:', id);
+  var o = null;
+  for(var i=0;i<cusOrders.length;i++){
+    if(String(cusOrders[i].id)===String(id)){ o=cusOrders[i]; break; }
+  }
+  if(!o){ alert('Order not found'); return; }
+  if(!confirm('Mark order '+id+' for '+o.customer+' as RETURNED?\nStock will not change.')) return;
+  o.status = 'returned';
+  o.returnedDate = new Date().toLocaleDateString('en-LK');
+  saveCusOrders();
+  renderCusOrders();
+  renderCOMetrics();
+  updateCOBadge();
+  toast('Order marked as returned.','ok');
+}
+
+function coDo_delete(id){
+  console.log('coDo_delete called with:', id);
+  var o = null;
+  for(var i=0;i<cusOrders.length;i++){
+    if(String(cusOrders[i].id)===String(id)){ o=cusOrders[i]; break; }
+  }
+  if(!o){ alert('Order not found'); return; }
+  if(!confirm('Delete order '+id+' for '+o.customer+'?\nThis cannot be undone.')) return;
+  cusOrders = cusOrders.filter(function(x){ return String(x.id)!==String(id); });
+  saveCusOrders();
+  renderCusOrders();
+  renderCOMetrics();
+  updateCOBadge();
+  toast('Order deleted.','ok');
+}
+
+
+// Window-level functions for customer order buttons (most reliable cross-browser approach)
+window.coDeliver = function(id){ coDo_deliver(id); };
+window.coReturn  = function(id){ coDo_return(id); };
+window.coDelete  = function(id){ coDo_delete(id); };
+
+function renderCusOrders(){
+  var fstatus = (document.getElementById('co-fstatus')||{}).value||'';
+  var srch = ((document.getElementById('co-srch')||{}).value||'').toLowerCase();
+  var recs = cusOrders.filter(function(o){
+    if(fstatus && o.status!==fstatus) return false;
+    if(srch && !(o.customer+(o.phone||'')+(o.id||'')).toLowerCase().includes(srch)) return false;
+    return true;
+  });
+  var el = document.getElementById('co-list');
+  if(!el){ renderCOMetrics(); return; }
+  if(!recs.length){
+    el.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text2)">No orders yet. Click "New customer order" to get started.</div>';
+    renderCOMetrics(); return;
+  }
+
+  var parts = [];
+  for(var ri=0; ri<recs.length; ri++){
+    var o = recs[ri];
+    var sid = JSON.stringify(o.id); // safe string like "ORD-123456"
+    var statusBg    = o.status==='delivered' ? 'var(--green-bg)'  : o.status==='returned' ? 'var(--red-bg)'   : 'var(--amber-bg)';
+    var statusColor = o.status==='delivered' ? 'var(--green)'     : o.status==='returned' ? 'var(--red)'      : 'var(--amber)';
+    var statusLabel = o.status==='delivered' ? '&#9989; Delivered' : o.status==='returned' ? '&#8617; Returned' : '&#8987; Pending';
+
+    var itemRows = '';
+    var items = o.items || [];
+    for(var ii=0; ii<items.length; ii++){
+      var it = items[ii];
+      itemRows += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">'
+        + '<span>' + (it.name||'') + (it.size?' ('+it.size+')':'') + ' x' + (it.qty||1) + '</span>'
+        + '<span style="font-weight:600">' + fmt(it.total||0) + '</span>'
+        + '</div>';
+    }
+
+    var actionBtns = '';
+    if(o.status === 'pending'){
+      actionBtns = '<button onclick="window.coDeliver(' + sid + ')" style="font-size:12px;padding:7px 16px;background:#1d7a4f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">&#9989; Mark delivered</button>'
+                 + '<button onclick="window.coReturn(' + sid + ')" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">&#8617; Mark returned</button>';
+    } else if(o.status === 'delivered'){
+      actionBtns = '<span style="font-size:12px;color:#4caf80;padding:4px 0;display:inline-block;margin-right:8px">&#9989; Delivered ' + (o.deliveredDate||'') + ' &mdash; sale auto-recorded</span>';
+    } else {
+      actionBtns = '<span style="font-size:12px;color:var(--red);padding:4px 0;display:inline-block;margin-right:8px">&#8617; Returned ' + (o.returnedDate||'') + '</span>';
+    }
+    actionBtns += '<button onclick="window.coDelete(' + sid + ')" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto">&#128465; Delete</button>';
+
+    var card = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">'
+      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'
+        + '<div>'
+          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
+            + '<span style="font-size:14px;font-weight:700">' + (o.customer||'') + '</span>'
+            + '<span style="font-family:monospace;font-size:11px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px">' + (o.id||'') + '</span>'
+            + '<span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;background:' + statusBg + ';color:' + statusColor + '">' + statusLabel + '</span>'
+          + '</div>'
+          + (o.phone ? '<div style="font-size:12px;color:var(--text2)">&#128222; ' + o.phone + (o.address ? '&nbsp;&nbsp;&#128205; ' + o.address : '') + '</div>' : '')
+          + '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + (o.date||'') + ' ' + (o.time||'') + '</div>'
+        + '</div>'
+        + '<div style="text-align:right">'
+          + '<div style="font-size:18px;font-weight:700;color:var(--green)">' + fmt(o.grandTotal||0) + '</div>'
+          + '<div style="font-size:11px;color:#4caf80">Net: ' + fmt(o.netTotal||o.grandTotal||0) + '</div>'
+        + '</div>'
+      + '</div>'
+      + '<div style="background:var(--surface2);border-radius:var(--r);padding:10px;margin-bottom:10px">'
+        + itemRows
+        + '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>Items subtotal</span><span>' + fmt(o.subTotal||0) + '</span></div>'
+        + ((o.delivery||0)>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4caf80">+ Delivery charged</span><span style="color:#4caf80">' + fmt(o.delivery) + '</span></div>' : '')
+        + ((o.myDelivery||0)>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">- Courier fee</span><span style="color:var(--red)">' + fmt(o.myDelivery) + '</span></div>' : '')
+        + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px;color:#4caf80"><span>&#128176; Net you receive</span><span>' + fmt(o.netTotal||o.grandTotal||0) + '</span></div>'
+      + '</div>'
+      + (o.notes ? '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">&#128221; ' + o.notes + '</div>' : '')
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + actionBtns + '</div>'
+    + '</div>';
+    parts.push(card);
+  }
+  el.innerHTML = parts.join('');
+  renderCOMetrics();
+}
+
+
+// ── Wholesale orders ──────────────────────────────────────────
+let wsOrders = [];
+function loadWSOrders(){ try{ wsOrders=JSON.parse(localStorage.getItem('sm_ws')||'[]'); }catch(e){ wsOrders=[]; } }
+function saveWSOrders(){ localStorage.setItem('sm_ws', JSON.stringify(wsOrders)); }
+
+window.wsDeliver = function(id){ wsDo_deliver(id); };
+window.wsReturn  = function(id){ wsDo_return(id); };
+window.wsDelete  = function(id){ wsDo_delete(id); };
+
+function openWSModal(){
+  // Build item options with wholesale price shown
+  var itemOpts = '';
+  for(var i=0;i<inv.length;i++){
+    var it=inv[i];
+    var wsPrice = it.wholesale||it.price;
+    itemOpts += '<option value="'+it.id+'">'+it.name+' | WS: '+fmt(wsPrice)+' | Stock: '+it.stock+'</option>';
+  }
+  var sizeOpts='';
+  for(var s=0;s<SIZES.length;s++) sizeOpts+='<option>'+SIZES[s]+'</option>';
+
+  showModal('<div class="modal">'
+    +'<div class="mh"><h2 style="display:flex;align-items:center;gap:8px"><i class="ti ti-building-store"></i> New wholesale order</h2><button class="abtn" onclick="closeModal()"><i class="ti ti-x"></i></button></div>'
+    +'<div style="background:linear-gradient(135deg,rgba(249,83,198,.1),rgba(185,29,115,.1));border:1px solid rgba(249,83,198,.3);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle" style="vertical-align:-2px"></i> Wholesale uses special bulk pricing. Mark as Delivered to auto-record in sales.</div>'
+    +'<div class="fg">'
+      +'<div class="fr"><label>Buyer / Business name *</label><input id="ws-name" placeholder="e.g. Silva Boutique"/></div>'
+      +'<div class="fr"><label>Phone number</label><input id="ws-phone" placeholder="+94771234567 (optional)"/></div>'
+    +'</div>'
+    +'<div class="fr"><label>Delivery address</label><input id="ws-addr" placeholder="Address (optional)"/></div>'
+    +'<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;margin-bottom:14px">'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Order items (wholesale prices apply)</div>'
+      +'<div id="ws-items-wrap">'
+        +'<div class="ws-item-row" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+          +'<select class="ws-item-sel" onchange="updateWSPrice(this)" style="font-size:12px;border:1px solid var(--border2);border-radius:var(--r);padding:6px 8px;background:var(--surface);color:var(--text)">'+itemOpts+'</select>'
+          +'<select class="ws-size-sel" style="font-size:12px;border:1px solid var(--border2);border-radius:var(--r);padding:6px 8px;background:var(--surface);color:var(--text)">'+sizeOpts+'</select>'
+          +'<input type="number" class="ws-qty-inp" min="1" value="3" placeholder="Qty" oninput="calcWSTotal()" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:6px 10px;background:var(--surface);color:var(--text)"/>'
+          +'<input type="number" class="ws-price-inp" min="0" placeholder="WS price" oninput="calcWSTotal()" style="font-size:13px;border:1px solid rgba(249,83,198,.5);border-radius:var(--r);padding:6px 10px;background:var(--surface);color:var(--text)"/>'
+        +'</div>'
+      +'</div>'
+      +'<button onclick="addWSItemRow()" style="font-size:12px;padding:4px 12px;margin-bottom:4px"><i class="ti ti-plus"></i> Add item</button>'
+    +'</div>'
+    +'<div class="fg">'
+      +'<div class="fr"><label style="color:#4caf80">Delivery buyer pays (LKR)</label><input id="ws-delivery" type="number" min="0" value="0" oninput="calcWSTotal()" style="border-color:#4caf80"/></div>'
+      +'<div class="fr"><label style="color:var(--red)">Delivery YOU pay courier (LKR)</label><input id="ws-my-delivery" type="number" min="0" value="0" oninput="calcWSTotal()" style="border-color:var(--red)"/></div>'
+    +'</div>'
+    +'<div style="background:rgba(249,83,198,0.08);border:1px solid rgba(249,83,198,0.25);border-radius:var(--r);padding:12px 14px;margin-bottom:14px">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Items subtotal</span><span id="ws-sub-display">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#4caf80">+ Delivery charged</span><span id="ws-cus-del-display" style="color:#4caf80">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:8px"><span>Grand total buyer pays</span><span id="ws-total-display" style="color:#f953c6">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--red)">- Courier fee</span><span id="ws-my-del-display" style="color:var(--red)">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700"><span>&#128176; Net you receive</span><span id="ws-net-display" style="color:#4caf80">Rs. 0</span></div>'
+    +'</div>'
+    +'<div class="fr"><label>Notes</label><textarea id="ws-notes" rows="2" placeholder="Special terms, payment notes..."></textarea></div>'
+    +'<div class="mf"><button onclick="closeModal()">Cancel</button><button onclick="saveWSOrder()" style="background:linear-gradient(135deg,#f953c6,#b91d73);color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:13px;font-weight:600;cursor:pointer">Save wholesale order</button></div>'
+  +'</div>');
+  setTimeout(function(){ updateAllWSPrices(); calcWSTotal(); }, 80);
+}
+
+function updateWSPrice(sel){
+  var row = sel.closest('.ws-item-row');
+  if(!row) return;
+  var itemId = parseInt(sel.value);
+  var item = null;
+  for(var i=0;i<inv.length;i++){ if(inv[i].id===itemId){item=inv[i];break;} }
+  if(item){
+    var priceInp = row.querySelector('.ws-price-inp');
+    if(priceInp) priceInp.value = item.wholesale||item.price;
+  }
+  calcWSTotal();
+}
+
+function updateAllWSPrices(){
+  var sels = document.querySelectorAll('.ws-item-sel');
+  for(var i=0;i<sels.length;i++) updateWSPrice(sels[i]);
+}
+
+function addWSItemRow(){
+  var itemOpts='';
+  for(var i=0;i<inv.length;i++){
+    var it=inv[i];
+    itemOpts+='<option value="'+it.id+'">'+it.name+' | WS: '+fmt(it.wholesale||it.price)+' | Stock: '+it.stock+'</option>';
+  }
+  var sizeOpts='';
+  for(var s=0;s<SIZES.length;s++) sizeOpts+='<option>'+SIZES[s]+'</option>';
+  var wrap=document.getElementById('ws-items-wrap');
+  if(!wrap) return;
+  var row=document.createElement('div');
+  row.className='ws-item-row';
+  row.style.cssText='display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px';
+  row.innerHTML='<select class="ws-item-sel" onchange="updateWSPrice(this)" style="font-size:12px;border:1px solid var(--border2);border-radius:var(--r);padding:6px 8px;background:var(--surface);color:var(--text)">'+itemOpts+'</select>'
+    +'<select class="ws-size-sel" style="font-size:12px;border:1px solid var(--border2);border-radius:var(--r);padding:6px 8px;background:var(--surface);color:var(--text)">'+sizeOpts+'</select>'
+    +'<input type="number" class="ws-qty-inp" min="1" value="3" placeholder="Qty" oninput="calcWSTotal()" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:6px 10px;background:var(--surface);color:var(--text)"/>'
+    +'<input type="number" class="ws-price-inp" min="0" placeholder="WS price" oninput="calcWSTotal()" style="font-size:13px;border:1px solid rgba(249,83,198,.5);border-radius:var(--r);padding:6px 10px;background:var(--surface);color:var(--text)"/>';
+  wrap.appendChild(row);
+  updateWSPrice(row.querySelector('.ws-item-sel'));
+}
+
+function calcWSTotal(){
+  var sub=0;
+  var rows=document.querySelectorAll('.ws-item-row');
+  for(var i=0;i<rows.length;i++){
+    var sel=rows[i].querySelector('.ws-item-sel');
+    var qty=parseInt(rows[i].querySelector('.ws-qty-inp')?.value)||1;
+    var wsPrice=parseFloat(rows[i].querySelector('.ws-price-inp')?.value)||0;
+    if(wsPrice) sub+=wsPrice*qty;
+    else if(sel){
+      var item=null;
+      for(var j=0;j<inv.length;j++){if(inv[j].id===parseInt(sel.value)){item=inv[j];break;}}
+      if(item) sub+=(item.wholesale||item.price)*qty;
+    }
+  }
+  var cusDel=parseFloat(document.getElementById('ws-delivery')?.value)||0;
+  var myDel=parseFloat(document.getElementById('ws-my-delivery')?.value)||0;
+  var grand=sub+cusDel;
+  var net=grand-myDel;
+  var e1=document.getElementById('ws-sub-display');
+  var e2=document.getElementById('ws-cus-del-display');
+  var e3=document.getElementById('ws-total-display');
+  var e4=document.getElementById('ws-my-del-display');
+  var e5=document.getElementById('ws-net-display');
+  if(e1)e1.textContent=fmt(sub);
+  if(e2)e2.textContent=fmt(cusDel);
+  if(e3)e3.textContent=fmt(grand);
+  if(e4)e4.textContent=fmt(myDel);
+  if(e5)e5.textContent=fmt(net);
+}
+
+function saveWSOrder(){
+  var name=(document.getElementById('ws-name')||{}).value?.trim()||'';
+  if(!name){toast('Buyer name is required','err');return;}
+  var phone=(document.getElementById('ws-phone')||{}).value?.trim()||'';
+  var addr=(document.getElementById('ws-addr')||{}).value?.trim()||'';
+  var notes=(document.getElementById('ws-notes')||{}).value?.trim()||'';
+  var cusDel=parseFloat(document.getElementById('ws-delivery')?.value)||0;
+  var myDel=parseFloat(document.getElementById('ws-my-delivery')?.value)||0;
+  var items=[];
+  var rows=document.querySelectorAll('.ws-item-row');
+  for(var i=0;i<rows.length;i++){
+    var sel=rows[i].querySelector('.ws-item-sel');
+    var sizeSel=rows[i].querySelector('.ws-size-sel');
+    var qty=parseInt(rows[i].querySelector('.ws-qty-inp')?.value)||1;
+    var wsPrice=parseFloat(rows[i].querySelector('.ws-price-inp')?.value)||0;
+    if(sel){
+      var item=null;
+      for(var j=0;j<inv.length;j++){if(inv[j].id===parseInt(sel.value)){item=inv[j];break;}}
+      if(item){
+        var unitPrice=wsPrice||(item.wholesale||item.price);
+        items.push({itemId:item.id,name:item.name,sku:item.sku,retailPrice:item.price,wsPrice:unitPrice,qty:qty,size:sizeSel?.value||'',total:unitPrice*qty});
+      }
+    }
+  }
+  if(!items.length){toast('Add at least one item','err');return;}
+  var subTotal=items.reduce(function(a,b){return a+b.total;},0);
+  var grandTotal=subTotal+cusDel;
+  var netTotal=grandTotal-myDel;
+  var orderId='WS-'+String(Date.now()).slice(-6);
+  var now=new Date();
+  wsOrders.unshift({id:orderId,buyer:name,phone:phone,address:addr,notes:notes,items:items,delivery:cusDel,myDelivery:myDel,subTotal:subTotal,grandTotal:grandTotal,netTotal:netTotal,status:'pending',date:now.toLocaleDateString('en-LK'),time:now.toLocaleTimeString('en-LK')});
+  saveWSOrders();
+  closeModal();
+  renderWholesale();
+  renderWSMetrics();
+  toast('Wholesale order '+orderId+' saved for '+name,'ok');
+}
+
+function wsDo_deliver(id){
+  var o=null;
+  for(var i=0;i<wsOrders.length;i++){if(String(wsOrders[i].id)===String(id)){o=wsOrders[i];break;}}
+  if(!o){alert('Order not found');return;}
+  if(o.status==='delivered'){alert('Already delivered');return;}
+  if(!confirm('Mark wholesale order '+id+' for '+o.buyer+' as DELIVERED?\n\nThis will:\n- Record as wholesale sale\n- Reduce stock\n- Add to Finance'))return;
   o.status='delivered';
   o.deliveredDate=new Date().toLocaleDateString('en-LK');
   for(var ii=0;ii<(o.items||[]).length;ii++){
     var oi=o.items[ii];
     var item=null;
-    for(var j=0;j<inv.length;j++){ if(inv[j].id===oi.itemId){item=inv[j];break;} }
+    for(var j=0;j<inv.length;j++){if(inv[j].id===oi.itemId){item=inv[j];break;}}
     if(item){
-      item.stock=Math.max(0,item.stock-oi.qty);
-      item.sold=(item.sold||0)+oi.qty;
-      history.unshift({type:'sale',name:item.name,sku:item.sku,qty:oi.qty,size:oi.size||'',color:'',total:oi.total||0,netRevenue:oi.total||0,date:'Just now ('+o.customer+')'});
+      item.stock=Math.max(0,item.stock-(oi.qty||1));
+      item.sold=(item.sold||0)+(oi.qty||1);
+      history.unshift({type:'sale',name:item.name,sku:item.sku,qty:oi.qty||1,size:oi.size||'',color:'',total:oi.total||0,netRevenue:oi.total||0,saleType:'wholesale',buyer:o.buyer,date:'Wholesale ('+o.buyer+')'});
     }
   }
   loadFinances();
   var d=new Date().toISOString().split('T')[0];
-  finances.unshift({id:Date.now(),type:'income',cat:'Sales revenue',amount:o.subTotal||0,desc:'Order '+id+' - '+o.customer,date:d});
-  if((o.delivery||0)>0) finances.unshift({id:Date.now()+1,type:'income',cat:'Delivery income',amount:o.delivery,desc:'Delivery for Order '+id,date:d});
-  if((o.myDelivery||0)>0) finances.unshift({id:Date.now()+2,type:'expense',cat:'Delivery cost',amount:o.myDelivery,desc:'Courier for Order '+id,date:d});
+  finances.unshift({id:Date.now(),type:'income',cat:'Sales revenue',amount:o.subTotal||0,desc:'Wholesale Order '+id+' - '+o.buyer,date:d});
+  if((o.delivery||0)>0) finances.unshift({id:Date.now()+1,type:'income',cat:'Delivery income',amount:o.delivery,desc:'Delivery: Wholesale '+id,date:d});
+  if((o.myDelivery||0)>0) finances.unshift({id:Date.now()+2,type:'expense',cat:'Delivery cost',amount:o.myDelivery,desc:'Courier: Wholesale '+id,date:d});
   saveFinances();
-  lsSave(); saveCusOrders();
-  renderAll(); renderCusOrders(); renderCOMetrics(); updateCOBadge();
-  toast('Order delivered! Sale recorded ✓','ok');
+  lsSave();saveWSOrders();
+  renderAll();renderWholesale();renderWSMetrics();
+  toast('Wholesale order delivered! Sale recorded.','ok');
 }
 
-function coDo_return(id){
+function wsDo_return(id){
   var o=null;
-  for(var i=0;i<cusOrders.length;i++){ if(cusOrders[i].id===id){o=cusOrders[i];break;} }
-  if(!o) return;
-  if(!confirm('Mark order '+id+' for '+o.customer+' as RETURNED?\nStock will not be changed.')) return;
+  for(var i=0;i<wsOrders.length;i++){if(String(wsOrders[i].id)===String(id)){o=wsOrders[i];break;}}
+  if(!o)return;
+  if(!confirm('Mark wholesale order '+id+' for '+o.buyer+' as RETURNED?\nStock will not change.'))return;
   o.status='returned';
   o.returnedDate=new Date().toLocaleDateString('en-LK');
-  saveCusOrders(); renderCusOrders(); renderCOMetrics(); updateCOBadge();
-  toast('Order marked as returned','ok');
+  saveWSOrders();renderWholesale();renderWSMetrics();
+  toast('Wholesale order marked as returned.','ok');
 }
 
-function coDo_delete(id){
+function wsDo_delete(id){
   var o=null;
-  for(var i=0;i<cusOrders.length;i++){ if(cusOrders[i].id===id){o=cusOrders[i];break;} }
-  if(!o) return;
-  if(!confirm('Delete order '+id+' for '+o.customer+'?\nThis cannot be undone.')) return;
-  cusOrders=cusOrders.filter(function(x){ return x.id!==id; });
-  saveCusOrders(); renderCusOrders(); renderCOMetrics(); updateCOBadge();
-  toast('Order deleted','ok');
+  for(var i=0;i<wsOrders.length;i++){if(String(wsOrders[i].id)===String(id)){o=wsOrders[i];break;}}
+  if(!o)return;
+  if(!confirm('Delete wholesale order '+id+' for '+o.buyer+'?\nCannot be undone.'))return;
+  wsOrders=wsOrders.filter(function(x){return String(x.id)!==String(id);});
+  saveWSOrders();renderWholesale();renderWSMetrics();
+  toast('Wholesale order deleted.','ok');
 }
 
-function renderCusOrders(){
-  const fstatus=document.getElementById('co-fstatus')?.value||'';
-  const srch=(document.getElementById('co-srch')?.value||'').toLowerCase();
-  let recs=cusOrders.filter(function(o){
-    if(fstatus && o.status!==fstatus) return false;
-    if(srch && !(o.customer+(o.phone||'')+(o.id||'')).toLowerCase().includes(srch)) return false;
+function renderWSMetrics(){
+  var el=document.getElementById('ws-metrics');if(!el)return;
+  var total=wsOrders.length;
+  var pending=wsOrders.filter(function(o){return o.status==='pending';}).length;
+  var delivered=wsOrders.filter(function(o){return o.status==='delivered';}).length;
+  var returned=wsOrders.filter(function(o){return o.status==='returned';}).length;
+  var revenue=wsOrders.filter(function(o){return o.status==='delivered';}).reduce(function(a,b){return a+(b.netTotal||0);},0);
+  el.innerHTML='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Total orders</div><div style="font-size:22px;font-weight:600">'+total+'</div><div style="font-size:11px;color:var(--text2)">'+pending+' pending</div></div>'
+    +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Delivered</div><div style="font-size:22px;font-weight:600;color:var(--green)">'+delivered+'</div><div style="font-size:11px;color:var(--text2)">orders</div></div>'
+    +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Returned</div><div style="font-size:22px;font-weight:600;color:var(--red)">'+returned+'</div><div style="font-size:11px;color:var(--text2)">orders</div></div>'
+    +'<div style="background:var(--surface);border:1px solid rgba(249,83,198,.3);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Wholesale revenue</div><div style="font-size:18px;font-weight:600;color:#f953c6">'+fmt(revenue)+'</div><div style="font-size:11px;color:var(--text2)">net received</div></div>';
+}
+
+function renderWholesale(){
+  var fstatus=(document.getElementById('ws-fstatus')||{}).value||'';
+  var srch=((document.getElementById('ws-srch')||{}).value||'').toLowerCase();
+  var recs=wsOrders.filter(function(o){
+    if(fstatus&&o.status!==fstatus)return false;
+    if(srch&&!(o.buyer+(o.phone||'')+(o.id||'')).toLowerCase().includes(srch))return false;
     return true;
   });
-  var el=document.getElementById('co-list');
-  if(!el) return;
+  var el=document.getElementById('ws-list');if(!el)return;
   if(!recs.length){
-    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)"><i class="ti ti-package" style="font-size:28px;display:block;margin-bottom:8px"></i>No orders yet.</div>';
-    renderCOMetrics(); return;
+    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)"><i class="ti ti-building-store" style="font-size:28px;display:block;margin-bottom:8px"></i>No wholesale orders yet. Click "New wholesale order" to get started.</div>';
+    renderWSMetrics();return;
   }
-  var html2='';
+  var parts=[];
   for(var ri=0;ri<recs.length;ri++){
     var o=recs[ri];
-    var statusBg = o.status==='delivered'?'var(--green-bg)':o.status==='returned'?'var(--red-bg)':'var(--amber-bg)';
-    var statusColor = o.status==='delivered'?'var(--green)':o.status==='returned'?'var(--red)':'var(--amber)';
-    var statusLabel = o.status==='delivered'?'✅ Delivered':o.status==='returned'?'↩ Returned':'⏳ Pending';
+    var sid=JSON.stringify(o.id);
+    var statusBg=o.status==='delivered'?'var(--green-bg)':o.status==='returned'?'var(--red-bg)':'rgba(249,83,198,.15)';
+    var statusColor=o.status==='delivered'?'var(--green)':o.status==='returned'?'var(--red)':'#f953c6';
+    var statusLabel=o.status==='delivered'?'&#9989; Delivered':o.status==='returned'?'&#8617; Returned':'&#8987; Pending';
     var itemRows='';
-    for(var ii=0;ii<(o.items||[]).length;ii++){
-      var it=o.items[ii];
-      itemRows+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>'+it.name+(it.size?' ('+it.size+')':'')+' x'+it.qty+'</span><span style="font-weight:600">'+fmt(it.total||0)+'</span></div>';
+    var items=o.items||[];
+    for(var ii=0;ii<items.length;ii++){
+      var it=items[ii];
+      itemRows+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">'
+        +'<span>'+it.name+(it.size?' ('+it.size+')':'')+' x'+it.qty+' @ '+fmt(it.wsPrice||0)+'</span>'
+        +'<span style="font-weight:600;color:#f953c6">'+fmt(it.total||0)+'</span>'
+        +'</div>';
     }
     var actionBtns='';
     if(o.status==='pending'){
-      actionBtns='<button data-oid="'+o.id+'" data-act="deliver" style="font-size:12px;padding:7px 16px;background:#1d7a4f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">✅ Mark delivered</button>'
-               +'<button data-oid="'+o.id+'" data-act="return" style="font-size:12px;padding:7px 16px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">↩ Mark returned</button>';
-    } else if(o.status==='delivered'){
-      actionBtns='<span style="font-size:12px;color:#4caf80;margin-right:6px">✅ Delivered '+( o.deliveredDate||'')+' — sale recorded</span>';
-    } else {
-      actionBtns='<span style="font-size:12px;color:var(--red);margin-right:6px">↩ Returned '+(o.returnedDate||'')+'</span>';
+      actionBtns='<button onclick="window.wsDeliver('+sid+')" style="font-size:12px;padding:7px 16px;background:#1d7a4f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">&#9989; Mark delivered</button>'
+                +'<button onclick="window.wsReturn('+sid+')" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">&#8617; Mark returned</button>';
+    }else if(o.status==='delivered'){
+      actionBtns='<span style="font-size:12px;color:#4caf80;margin-right:8px">&#9989; Delivered '+(o.deliveredDate||'')+' &mdash; sale recorded</span>';
+    }else{
+      actionBtns='<span style="font-size:12px;color:var(--red);margin-right:8px">&#8617; Returned '+(o.returnedDate||'')+'</span>';
     }
-    actionBtns+='<button data-oid="'+o.id+'" data-act="delete" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto">🗑 Delete</button>';
-
-    html2+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">'
+    actionBtns+='<button onclick="window.wsDelete('+sid+')" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto">&#128465; Delete</button>';
+    parts.push('<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">'
       +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'
         +'<div>'
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
-            +'<span style="font-size:14px;font-weight:700">'+o.customer+'</span>'
+            +'<span style="font-size:14px;font-weight:700">'+o.buyer+'</span>'
             +'<span style="font-family:monospace;font-size:11px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px">'+o.id+'</span>'
             +'<span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;background:'+statusBg+';color:'+statusColor+'">'+statusLabel+'</span>'
+            +'<span style="font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(249,83,198,.15);color:#f953c6;font-weight:600">WHOLESALE</span>'
           +'</div>'
-          +(o.phone?'<div style="font-size:12px;color:var(--text2)">📞 '+o.phone+(o.address?' &nbsp;📍 '+o.address:'')+'</div>':'')
+          +(o.phone?'<div style="font-size:12px;color:var(--text2)">&#128222; '+o.phone+(o.address?' &nbsp;&#128205; '+o.address:'')+'</div>':'')
           +'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+o.date+' '+(o.time||'')+'</div>'
         +'</div>'
         +'<div style="text-align:right">'
-          +'<div style="font-size:18px;font-weight:700;color:var(--green)">'+fmt(o.grandTotal||0)+'</div>'
+          +'<div style="font-size:18px;font-weight:700;color:#f953c6">'+fmt(o.grandTotal||0)+'</div>'
           +'<div style="font-size:11px;color:#4caf80">Net: '+fmt(o.netTotal||o.grandTotal||0)+'</div>'
         +'</div>'
       +'</div>'
-      +'<div style="background:var(--surface2);border-radius:var(--r);padding:10px;margin-bottom:10px">'
-        +itemRows
-        +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>Items subtotal</span><span>'+fmt(o.subTotal||0)+'</span></div>'
-        +(o.delivery>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4caf80">+ Delivery charged</span><span style="color:#4caf80">'+fmt(o.delivery)+'</span></div>':'')
-        +(( o.myDelivery||0)>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">- Courier fee</span><span style="color:var(--red)">'+fmt(o.myDelivery)+'</span></div>':'')
-        +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px;color:#4caf80"><span>💰 Net you receive</span><span>'+fmt(o.netTotal||o.grandTotal||0)+'</span></div>'
+      +'<div style="background:var(--surface2);border-radius:var(--r);padding:10px;margin-bottom:10px">'+itemRows
+        +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>Subtotal</span><span>'+fmt(o.subTotal||0)+'</span></div>'
+        +((o.delivery||0)>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4caf80">+ Delivery charged</span><span style="color:#4caf80">'+fmt(o.delivery)+'</span></div>':'')
+        +((o.myDelivery||0)>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">- Courier fee</span><span style="color:var(--red)">'+fmt(o.myDelivery)+'</span></div>':'')
+        +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px;color:#4caf80"><span>&#128176; Net you receive</span><span>'+fmt(o.netTotal||o.grandTotal||0)+'</span></div>'
       +'</div>'
-      +(o.notes?'<div style="font-size:12px;color:var(--text2);margin-bottom:10px">📝 '+o.notes+'</div>':'')
+      +(o.notes?'<div style="font-size:12px;color:var(--text2);margin-bottom:10px">&#128221; '+o.notes+'</div>':'')
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+actionBtns+'</div>'
-    +'</div>';
+    +'</div>');
   }
-  el.innerHTML=html2;
-  // Event delegation for all buttons in list
-  el.onclick=function(e){
-    var btn=e.target.closest('[data-act]');
-    if(!btn) return;
-    var act=btn.getAttribute('data-act');
-    var oid=btn.getAttribute('data-oid');
-    if(act==='deliver') coDo_deliver(oid);
-    else if(act==='return') coDo_return(oid);
-    else if(act==='delete') coDo_delete(oid);
-  };
-  renderCOMetrics();
+  el.innerHTML=parts.join('');
+  renderWSMetrics();
+}
+
+
+// ── Excel Export (SheetJS) ────────────────────────────────────
+
+function clearAllData(){
+  if(!confirm('⚠️ CLEAR ALL DATA?\n\nThis will permanently delete:\n- All inventory items\n- All sales history\n- All customer orders\n- All wholesale orders\n- All finance records\n\nThis CANNOT be undone!\n\nAre you absolutely sure?')) return;
+  if(!confirm('Last chance! Click OK to delete everything.')) return;
+  localStorage.removeItem('sm_inv');
+  localStorage.removeItem('sm_hist');
+  localStorage.removeItem('sm_orders');
+  localStorage.removeItem('sm_notif');
+  localStorage.removeItem('sm_co');
+  localStorage.removeItem('sm_ws');
+  localStorage.removeItem('sm_fin');
+  inv=[]; history=[]; orders=[]; notifLog=[];
+  if(typeof cusOrders!=='undefined') cusOrders=[];
+  if(typeof wsOrders!=='undefined') wsOrders=[];
+  if(typeof finances!=='undefined') finances=[];
+  nextId=1; nextPO=1;
+  renderAll();
+  toast('All data cleared. Starting fresh.','ok');
+}
+
+function exportToExcel(){
+  // Load SheetJS dynamically if not already loaded
+  if(typeof XLSX === 'undefined'){
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    script.onload = function(){ buildExcel(); };
+    script.onerror = function(){ toast('Could not load Excel library. Check internet.','err'); };
+    document.head.appendChild(script);
+    toast('Loading Excel library...','ok');
+  } else {
+    buildExcel();
+  }
+}
+
+function buildExcel(){
+  try{
+    var wb = XLSX.utils.book_new();
+
+    // ── Sheet 1: Inventory ────────────────────────────────────
+    var invData = [['SKU','Item Name','Category','Gender','Sizes','Colors','Stock','Cost (LKR)','Retail Price (LKR)','Wholesale Price (LKR)','Min WS Qty','Stock Value (LKR)','Units Sold','Low Stock Alert']];
+    for(var i=0;i<inv.length;i++){
+      var it=inv[i];
+      invData.push([
+        it.sku||'',
+        it.name||'',
+        it.cat||'',
+        it.gender||'',
+        (it.sizes||[]).join(', '),
+        (it.colors||[]).join(', '),
+        it.stock||0,
+        it.cost||0,
+        it.price||0,
+        it.wholesale||0,
+        it.wsqty||0,
+        (it.stock||0)*(it.price||0),
+        it.sold||0,
+        it.low||5
+      ]);
+    }
+    var wsInv = XLSX.utils.aoa_to_sheet(invData);
+    wsInv['!cols'] = [{wch:10},{wch:25},{wch:12},{wch:10},{wch:20},{wch:20},{wch:8},{wch:12},{wch:16},{wch:18},{wch:12},{wch:14},{wch:12},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsInv, 'Inventory');
+
+    // ── Sheet 2: Sales & Activity ─────────────────────────────
+    var histData = [['Type','Item Name','SKU','Qty','Size','Color','Grand Total (LKR)','Net Revenue (LKR)','Delivery Charged','Courier Fee','Sale Type','Date']];
+    for(var h=0;h<history.length;h++){
+      var hh=history[h];
+      histData.push([
+        hh.type||'',
+        hh.name||'',
+        hh.sku||'',
+        hh.qty||0,
+        hh.size||'',
+        hh.color||'',
+        hh.total||0,
+        hh.netRevenue!==undefined?hh.netRevenue:(hh.total||0),
+        hh.cusDelivery||0,
+        hh.myDelivery||0,
+        hh.saleType||'retail',
+        hh.date||''
+      ]);
+    }
+    var wsHist = XLSX.utils.aoa_to_sheet(histData);
+    wsHist['!cols'] = [{wch:10},{wch:25},{wch:10},{wch:6},{wch:8},{wch:10},{wch:14},{wch:14},{wch:16},{wch:12},{wch:10},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, wsHist, 'Sales & Activity');
+
+    // ── Sheet 3: Customer Orders ──────────────────────────────
+    var coData = [['Order ID','Customer','Phone','Address','Items','Subtotal (LKR)','Delivery Charged','Courier Fee','Grand Total (LKR)','Net Received (LKR)','Status','Date','Notes']];
+    var allCO = typeof cusOrders!=='undefined'?cusOrders:[];
+    for(var c=0;c<allCO.length;c++){
+      var co=allCO[c];
+      var itemsSummary=(co.items||[]).map(function(it){return it.name+' x'+it.qty;}).join(', ');
+      coData.push([
+        co.id||'',
+        co.customer||'',
+        co.phone||'',
+        co.address||'',
+        itemsSummary,
+        co.subTotal||0,
+        co.delivery||0,
+        co.myDelivery||0,
+        co.grandTotal||0,
+        co.netTotal||co.grandTotal||0,
+        co.status||'',
+        co.date||'',
+        co.notes||''
+      ]);
+    }
+    var wsCO = XLSX.utils.aoa_to_sheet(coData);
+    wsCO['!cols'] = [{wch:12},{wch:20},{wch:14},{wch:25},{wch:30},{wch:14},{wch:16},{wch:12},{wch:14},{wch:14},{wch:12},{wch:14},{wch:25}];
+    XLSX.utils.book_append_sheet(wb, wsCO, 'Customer Orders');
+
+    // ── Sheet 4: Wholesale Orders ─────────────────────────────
+    var wsData = [['Order ID','Buyer','Phone','Address','Items','Subtotal (LKR)','Delivery Charged','Courier Fee','Grand Total (LKR)','Net Received (LKR)','Status','Date','Notes']];
+    var allWS = typeof wsOrders!=='undefined'?wsOrders:[];
+    for(var w=0;w<allWS.length;w++){
+      var wo=allWS[w];
+      var wItemsSummary=(wo.items||[]).map(function(it){return it.name+' x'+it.qty+' @Rs.'+it.wsPrice;}).join(', ');
+      wsData.push([
+        wo.id||'',
+        wo.buyer||'',
+        wo.phone||'',
+        wo.address||'',
+        wItemsSummary,
+        wo.subTotal||0,
+        wo.delivery||0,
+        wo.myDelivery||0,
+        wo.grandTotal||0,
+        wo.netTotal||wo.grandTotal||0,
+        wo.status||'',
+        wo.date||'',
+        wo.notes||''
+      ]);
+    }
+    var wsWS = XLSX.utils.aoa_to_sheet(wsData);
+    wsWS['!cols'] = [{wch:12},{wch:20},{wch:14},{wch:25},{wch:35},{wch:14},{wch:16},{wch:12},{wch:14},{wch:14},{wch:12},{wch:14},{wch:25}];
+    XLSX.utils.book_append_sheet(wb, wsWS, 'Wholesale Orders');
+
+    // ── Sheet 5: Finance ──────────────────────────────────────
+    var finData = [['Type','Category','Description','Amount (LKR)','Date']];
+    var allFin = typeof finances!=='undefined'?finances:[];
+    for(var f=0;f<allFin.length;f++){
+      var ff=allFin[f];
+      finData.push([ff.type||'',ff.cat||'',ff.desc||'',ff.amount||0,ff.date||'']);
+    }
+    // Add summary rows
+    var totalInc = allFin.filter(function(f){return f.type==='income';}).reduce(function(a,b){return a+(b.amount||0);},0);
+    var totalExp = allFin.filter(function(f){return f.type==='expense';}).reduce(function(a,b){return a+(b.amount||0);},0);
+    finData.push(['','','','','']);
+    finData.push(['SUMMARY','Total Income','',totalInc,'']);
+    finData.push(['SUMMARY','Total Expenses','',totalExp,'']);
+    finData.push(['SUMMARY','Net Profit','',totalInc-totalExp,'']);
+    var wsFin = XLSX.utils.aoa_to_sheet(finData);
+    wsFin['!cols'] = [{wch:10},{wch:20},{wch:35},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsFin, 'Finance');
+
+    // ── Sheet 6: Summary Dashboard ────────────────────────────
+    var now = new Date();
+    var summData = [
+      ['EDGEX STOCK MANAGEMENT - SUMMARY REPORT'],
+      ['Generated on:', now.toLocaleDateString('en-LK')+' '+now.toLocaleTimeString('en-LK')],
+      [''],
+      ['INVENTORY SUMMARY',''],
+      ['Total SKUs', inv.length],
+      ['Total stock units', inv.reduce(function(a,b){return a+(b.stock||0);},0)],
+      ['Stock value (retail)', inv.reduce(function(a,b){return a+(b.stock||0)*(b.price||0);},0)],
+      ['Items with photos', inv.filter(function(i){return i.photo;}).length],
+      ['Low stock items', inv.filter(function(i){return i.stock>0&&i.stock<=i.low;}).length],
+      ['Out of stock', inv.filter(function(i){return i.stock===0;}).length],
+      [''],
+      ['SALES SUMMARY',''],
+      ['Total sales recorded', history.filter(function(h){return h.type==='sale';}).length],
+      ['Total units sold', history.filter(function(h){return h.type==='sale';}).reduce(function(a,b){return a+(b.qty||0);},0)],
+      ['Total revenue', history.filter(function(h){return h.type==='sale';}).reduce(function(a,b){return a+(b.total||0);},0)],
+      [''],
+      ['CUSTOMER ORDERS',''],
+      ['Total orders', allCO.length],
+      ['Delivered', allCO.filter(function(o){return o.status==='delivered';}).length],
+      ['Pending', allCO.filter(function(o){return o.status==='pending';}).length],
+      ['Returned', allCO.filter(function(o){return o.status==='returned';}).length],
+      [''],
+      ['WHOLESALE ORDERS',''],
+      ['Total orders', allWS.length],
+      ['Delivered', allWS.filter(function(o){return o.status==='delivered';}).length],
+      ['Pending', allWS.filter(function(o){return o.status==='pending';}).length],
+      [''],
+      ['FINANCE SUMMARY',''],
+      ['Total income (LKR)', totalInc],
+      ['Total expenses (LKR)', totalExp],
+      ['Net profit (LKR)', totalInc-totalExp],
+    ];
+    var wsSumm = XLSX.utils.aoa_to_sheet(summData);
+    wsSumm['!cols'] = [{wch:30},{wch:20}];
+    XLSX.utils.book_append_sheet(wb, wsSumm, 'Summary');
+
+    // ── Download file ─────────────────────────────────────────
+    var filename = 'Edgex_Stock_'+now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+'.xlsx';
+    XLSX.writeFile(wb, filename);
+    toast('Excel file downloaded: '+filename,'ok');
+
+  }catch(e){
+    console.error('Excel export error:',e);
+    toast('Export failed: '+e.message,'err');
+  }
 }
 
 </script>
