@@ -210,7 +210,6 @@ tr:hover td{background:var(--surface2)}
   </div>
   <div class="hdr-actions">
     <button onclick="sw('whatsapp')" style="color:var(--wa);border-color:var(--wa)"><i class="ti ti-brand-whatsapp"></i> WhatsApp</button>
-    <button onclick="openModal('po')"><i class="ti ti-file-invoice"></i> New PO</button>
     <button onclick="openModal('sale_bulk')"><i class="ti ti-shopping-cart"></i> Sale</button>
     <button class="btn-primary" onclick="openModal('add')"><i class="ti ti-plus"></i> Add item</button>
   </div>
@@ -236,7 +235,7 @@ tr:hover td{background:var(--surface2)}
   <button class="tab" onclick="sw('analytics')" id="tab-analytics"><i class="ti ti-chart-bar" style="font-size:13px"></i>Analytics</button>
   <button class="tab" onclick="sw('history')" id="tab-history"><i class="ti ti-history" style="font-size:13px"></i>Activity</button>
   <button class="tab" onclick="sw('alerts')" id="tab-alerts"><i class="ti ti-bell" style="font-size:13px"></i>Alerts <span class="tbadge" id="abadge" style="display:none">0</span></button>
-  <button class="tab" onclick="sw('orders')" id="tab-orders"><i class="ti ti-truck" style="font-size:13px"></i>Orders</button>
+  
   <button class="tab" onclick="sw('whatsapp')" id="tab-whatsapp"><i class="ti ti-brand-whatsapp" style="font-size:13px"></i>WhatsApp</button>
   <button class="tab" onclick="sw('finance')" id="tab-finance"><i class="ti ti-cash" style="font-size:13px"></i>Finance</button>
   <button class="tab" onclick="sw('cusorders')" id="tab-cusorders"><i class="ti ti-package" style="font-size:13px"></i>Customer Orders <span class="tbadge" id="co-badge" style="display:none">0</span></button>
@@ -295,7 +294,7 @@ tr:hover td{background:var(--surface2)}
     <div style="position:relative;width:100%;height:170px"><canvas id="schart" role="img" aria-label="Sales bar chart last 7 days"></canvas></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Revenue vs cost</div><div style="position:relative;width:100%;height:140px"><canvas id="rchart" role="img" aria-label="Revenue vs cost bar"></canvas></div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Revenue vs cost</div><div style="position:relative;width:100%;height:200px"><canvas id="rchart" role="img" aria-label="Revenue vs cost bar"></canvas></div></div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Margin by item (top 5)</div><div id="mlist"></div></div>
   </div>
 </div>
@@ -313,10 +312,6 @@ tr:hover td{background:var(--surface2)}
 <div id="v-alerts" style="display:none"><div id="alerts-body"></div></div>
 
 <!-- Orders -->
-<div id="v-orders" style="display:none">
-  <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-    <button onclick="openModal('po')"><i class="ti ti-plus"></i> New order</button>
-  </div>
   <div id="orders-body"></div>
 </div>
 
@@ -428,16 +423,20 @@ const charts={};
 // ─── LocalStorage helpers ────────────────────────────────────
 function lsLoad(){
   try{
-    inv=JSON.parse(localStorage.getItem('sm_inv')||'[]');
-    history=JSON.parse(localStorage.getItem('sm_hist')||'[]');
-    orders=JSON.parse(localStorage.getItem('sm_orders')||'[]');
-    notifLog=JSON.parse(localStorage.getItem('sm_notif')||'[]');
-    waConfig=JSON.parse(localStorage.getItem('sm_wa')||JSON.stringify(waConfig));
+    const rawInv=localStorage.getItem('sm_inv');
+    inv=rawInv?JSON.parse(rawInv):[];
+    const rawHist=localStorage.getItem('sm_hist');
+    history=rawHist?JSON.parse(rawHist):[];
+    const rawOrders=localStorage.getItem('sm_orders');
+    orders=rawOrders?JSON.parse(rawOrders):[];
+    const rawNotif=localStorage.getItem('sm_notif');
+    notifLog=rawNotif?JSON.parse(rawNotif):[];
+    const rawWA=localStorage.getItem('sm_wa');
+    if(rawWA)waConfig=JSON.parse(rawWA);
     gsUrl=localStorage.getItem('sm_gsurl')||'';
-    nextId=Math.max(1,...inv.map(i=>i.id+1));
-    nextPO=Math.max(1,...orders.map(o=>parseInt(o.id.replace('PO-',''))||0)+1);
-  }catch(e){}
-  if(!inv.length) loadDemoData();
+    nextId=inv.length?Math.max(...inv.map(i=>parseInt(i.id)||0))+1:1;
+    nextPO=orders.length?Math.max(...orders.map(o=>parseInt((o.id||'').replace('PO-',''))||0))+1:1;
+  }catch(e){console.error('Load error:',e);}
 }
 
 function lsSave(){
@@ -512,8 +511,8 @@ async function loadFromGS(){
       }));
       history=d.history||[];
       orders=(d.orders||[]).map(o=>({...o,items:typeof o.items==='string'?JSON.parse(o.items||'[]'):o.items||[],total:parseFloat(o.total)||0}));
-      nextId=Math.max(1,...inv.map(i=>i.id+1));
-      nextPO=Math.max(1,...orders.map(o=>parseInt(o.id.replace('PO-',''))||0)+1);
+      nextId=inv.length?Math.max(...inv.map(i=>parseInt(i.id)||0))+1:1;
+      nextPO=orders.length?Math.max(...orders.map(o=>parseInt((o.id||'').replace('PO-',''))||0))+1:1;
       lsSave();
     }
     syncStatus='ok';updateSyncUI();
@@ -560,6 +559,7 @@ function renderMetrics(){
   const total=inv.reduce((a,b)=>a+b.stock,0);
   const val=inv.reduce((a,b)=>a+(b.stock*b.price),0);
   const rev=history.filter(h=>h.type==='sale').reduce((a,b)=>a+(b.total||0),0);
+  const netRev=history.filter(h=>h.type==='sale').reduce((a,b)=>a+(b.netRevenue!==undefined?b.netRevenue:b.total||0),0);
   const low=getLow().length+getOut().length;
   const wp=inv.filter(i=>i.photo).length;
   document.getElementById('metrics').innerHTML=`
@@ -725,13 +725,21 @@ function getAnSales(){
 }
 
 function renderAnalytics(){
-  // Show empty state if no inventory
   const noData = inv.length === 0;
+  // Get real sales data from history + customer orders
+  const allSales = history.filter(h=>h.type==='sale');
+  const deliveredOrders = (typeof cusOrders!=='undefined'?cusOrders:[]).filter(o=>o.status==='delivered');
+  const totalRevFromSales = allSales.reduce((a,b)=>a+(b.netRevenue!==undefined?b.netRevenue:b.total||0),0);
+  const totalRevFromOrders = deliveredOrders.reduce((a,b)=>a+(b.netTotal||b.grandTotal||0),0);
+  const totalRevenue = totalRevFromSales + totalRevFromOrders;
+  const totalCost = inv.reduce((a,b)=>a+(b.stock*b.cost),0);
+  const totalExpenses = (typeof finances!=='undefined'?finances:[]).filter(f=>f.type==='expense').reduce((a,b)=>a+b.amount,0);
 
   // Period summary
   const periodSales = getAnSales ? getAnSales() : history.filter(h=>h.type==='sale');
-  const periodRev = periodSales.reduce((a,b)=>a+(b.total||0),0);
-  const periodUnits = periodSales.reduce((a,b)=>a+(b.qty||0),0);
+  const periodOrderRevenue = deliveredOrders.reduce((a,b)=>a+(b.netTotal||b.grandTotal||0),0);
+  const periodRev = periodSales.reduce((a,b)=>a+(b.netRevenue!==undefined?b.netRevenue:b.total||0),0) + periodOrderRevenue;
+  const periodUnits = periodSales.reduce((a,b)=>a+(b.qty||0),0) + deliveredOrders.reduce((a,b)=>a+((b.items||[]).reduce((x,y)=>x+(y.qty||0),0)),0);
   const periodLabel = anPeriod==='day'?'Today':anPeriod==='month'?'This Month':'All Time';
   const sumEl = document.getElementById('an-summary');
   if(sumEl) sumEl.innerHTML=`
@@ -762,10 +770,21 @@ function renderAnalytics(){
   const tv=[...inv].sort((a,b)=>(b.stock*b.price)-(a.stock*a.price)).slice(0,5);
   const mv=(tv[0]?.stock*tv[0]?.price)||1;
   document.getElementById('top-val').innerHTML=tv.map(i=>`<div class="catrow"><div style="font-size:12px;width:95px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i.name}</div><div class="cattrack"><div class="catfill" style="width:${Math.round(i.stock*i.price/mv*100)}%;background:#7F77DD"></div></div><div style="font-size:11px;margin-left:8px;color:var(--text2);white-space:nowrap">${fmt(i.stock*i.price)}</div></div>`).join('');
-  // Real sales data from history
+  // Real 7-day sales data
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const salesData=days.map(()=>0); // placeholder - will be real when sales exist
-  history.filter(h=>h.type==='sale').slice(0,7).forEach((h,i)=>{ if(i<7) salesData[i]=(h.qty||0); });
+  const now7=new Date();
+  const salesData=days.map((_,di)=>{
+    const d=new Date(now7); d.setDate(d.getDate()-(6-di));
+    const dayStr=d.toDateString();
+    // Count from history
+    const fromHist=history.filter(h=>h.type==='sale'&&h.date&&(h.date.toLowerCase().includes('today')&&di===6||h.date.toLowerCase().includes('yesterday')&&di===5)).reduce((a,b)=>a+(b.qty||0),0);
+    // Count from delivered orders
+    const fromOrders=(typeof cusOrders!=='undefined'?cusOrders:[]).filter(o=>o.status==='delivered'&&o.deliveredDate).reduce((a,b)=>a+((b.items||[]).reduce((x,y)=>x+(y.qty||0),0)),0);
+    return di===6?fromHist:0;
+  });
+  // Also add delivered orders qty to today
+  const todayOrdersQty=(typeof cusOrders!=='undefined'?cusOrders:[]).filter(o=>o.status==='delivered').reduce((a,b)=>a+((b.items||[]).reduce((x,y)=>x+(y.qty||0),0)),0);
+  salesData[6]+=todayOrdersQty;
 
   const chartEl=document.getElementById('schart');
   if(!chartEl) return;
@@ -776,16 +795,51 @@ function renderAnalytics(){
     if(charts.s)charts.s.destroy();
     charts.s=new Chart(chartEl,{type:'bar',data:{labels:days,datasets:[{label:'Units',data:salesData,backgroundColor:'#f953c6',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.5)'}},y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.08)'},ticks:{font:{size:11},color:'rgba(255,255,255,.5)'}}}}});
   }
-  const sRev=history.filter(h=>h.type==='sale').reduce((a,b)=>a+(b.total||0),0);
-  const sCost=history.filter(h=>h.type==='restock').reduce((a,b)=>a+(b.total||0),0);
-  const sVal=inv.reduce((a,b)=>a+(b.stock*b.cost),0);
+  const sRev=totalRevenue;
+  const sCost=totalExpenses;
+  const sVal=totalCost;
   const rchartEl=document.getElementById('rchart');
   if(rchartEl){
-    if(!sRev&&!sCost&&!sVal){
-      rchartEl.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:140px;color:var(--text2);font-size:13px">No financial data yet</div>';
+    const chartRevenue = totalRevenue || sRev || 0;
+    const chartExpenses = totalExpenses || sCost || 0;
+    const chartStockVal = totalCost || sVal || 0;
+    const chartProfit = chartRevenue - chartExpenses;
+    if(!chartRevenue && !chartExpenses && !chartStockVal){
+      rchartEl.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:140px;color:var(--text2);font-size:13px;flex-direction:column;gap:8px"><i class="ti ti-chart-bar" style="font-size:28px;opacity:.3"></i><span>No financial data yet</span></div>';
     } else {
       if(charts.r)charts.r.destroy();
-      charts.r=new Chart(rchartEl,{type:'bar',data:{labels:['Revenue','COGS','Stock cost'],datasets:[{data:[sRev,sCost,sVal],backgroundColor:['#1D9E75','#f953c6','#7F77DD'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.08)'},ticks:{font:{size:10},color:'rgba(255,255,255,.5)',callback:v=>'Rs.'+Math.round(v/1000)+'k'}},y:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.5)'}}}}});
+      // Smart tick formatter - handles up to millions
+      const maxVal = Math.max(chartRevenue, chartExpenses, chartStockVal, chartProfit);
+      const tickFmt = v => {
+        if(v>=1000000) return 'Rs.'+(v/1000000).toFixed(1)+'M';
+        if(v>=1000) return 'Rs.'+(v/1000).toFixed(0)+'k';
+        return 'Rs.'+v;
+      };
+      charts.r=new Chart(rchartEl,{
+        type:'bar',
+        data:{
+          labels:['Net Revenue','Total Expenses','Stock Value','Net Profit'],
+          datasets:[{
+            data:[chartRevenue, chartExpenses, chartStockVal, chartProfit],
+            backgroundColor:['#4caf80','#e57373','#7F77DD',chartProfit>=0?'#4caf80':'#e57373'],
+            borderRadius:4
+          }]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          indexAxis:'y',
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmt(ctx.raw)}}},
+          scales:{
+            x:{
+              grid:{color:'rgba(255,255,255,.08)'},
+              ticks:{font:{size:10},color:'rgba(255,255,255,.5)',callback:tickFmt},
+              suggestedMax: Math.max(maxVal * 1.2, 100000)
+            },
+            y:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.6)'}}
+          }
+        }
+      });
     }
   }
   const margins=[...inv].sort((a,b)=>((b.price-b.cost)/b.price)-((a.price-a.cost)/a.price)).slice(0,5);
@@ -867,26 +921,31 @@ async function checkAndAlert(item,action,qty){
 
 // ─── Tab switching ────────────────────────────────────────────
 function sw(t){
-  ['inventory','catalogue','analytics','history','alerts','orders','whatsapp','finance','cusorders'].forEach(x=>{
-    document.getElementById('v-'+x).style.display=x===t?'block':'none';
-    document.getElementById('tab-'+x).classList.toggle('on',x===t);
+  ['inventory','catalogue','analytics','history','alerts','whatsapp','finance','cusorders'].forEach(function(x){
+    var el=document.getElementById('v-'+x);
+    var tab=document.getElementById('tab-'+x);
+    if(el) el.style.display=(x===t?'block':'none');
+    if(tab) tab.classList.toggle('on',x===t);
   });
-  if(t==='history')renderHist();
-  if(t==='alerts')renderAlerts();
-  if(t==='orders')renderOrders();
-  if(t==='analytics')setTimeout(renderAnalytics,80);
-  if(t==='catalogue')renderCat();
-  if(t==='finance'){
-    loadFinances();
-    updateFinCats();
-    const d=document.getElementById('fin-date');
-    if(d&&!d.value)d.value=new Date().toISOString().split('T')[0];
-    renderFinance();
-  }
+  if(t==='history') renderHist();
+  if(t==='alerts') renderAlerts();
+  if(t==='analytics') setTimeout(renderAnalytics,80);
+  if(t==='catalogue') renderCat();
+  if(t==='finance'){ loadFinances(); updateFinCats(); var fd=document.getElementById('fin-date'); if(fd&&!fd.value) fd.value=new Date().toISOString().split('T')[0]; renderFinance(); }
+  if(t==='cusorders'){ loadCusOrders(); renderCusOrders(); renderCOMetrics(); updateCOBadge(); }
   if(t==='whatsapp'){
-    const pe=document.getElementById('wa-phone');const ke=document.getElementById('wa-apikey');
-    if(pe)pe.value=waConfig.phone;if(ke)ke.value=waConfig.apikey;
-    saveWACfg();renderNLog();
+    var pe=document.getElementById('wa-phone'); var ke=document.getElementById('wa-apikey');
+    if(pe&&waConfig.phone) pe.value=waConfig.phone;
+    if(ke&&waConfig.apikey) ke.value=waConfig.apikey;
+    var wl=document.getElementById('wa-low'); var wo=document.getElementById('wa-out');
+    var ws=document.getElementById('wa-sale'); var wr=document.getElementById('wa-restock');
+    if(wl) wl.checked=waConfig.onLow;
+    if(wo) wo.checked=waConfig.onOut;
+    if(ws) ws.checked=waConfig.onSale;
+    if(wr) wr.checked=waConfig.onRestock;
+    var badge=document.getElementById('wa-badge');
+    if(badge){ if(waConfig.phone&&waConfig.apikey){badge.className='badge b-ok';badge.textContent='Configured';}else{badge.className='badge b-out';badge.textContent='Not configured';} }
+    renderNLog();
   }
 }
 
@@ -948,12 +1007,28 @@ function openEdit(id){showModal(itemFormHTML(inv.find(i=>i.id===id)));setTimeout
 
 function doSale(id){
   const i=inv.find(x=>x.id===id);
-  showModal(`<div class="modal modal-sm"><div class="mh"><h2>Record sale</h2><button class="abtn" onclick="closeModal()"><i class="ti ti-x"></i></button></div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">${i.photo?`<img src="${i.photo}" style="width:44px;height:44px;border-radius:var(--r);object-fit:cover;border:1px solid var(--border)" alt="${i.name}"/>`:''}
-    <div><div style="font-size:13px;font-weight:600">${i.name}</div><div style="font-size:12px;color:var(--text2)">${i.sku} · ${i.stock} units · ${fmt(i.price)}</div></div></div>
-    <div class="fg"><div class="fr"><label>Size</label><select id="s-size">${i.sizes.map(s=>`<option>${s}</option>`).join('')}</select></div><div class="fr"><label>Color</label><select id="s-color">${i.colors.map(c=>`<option>${c}</option>`).join('')}</select></div></div>
-    <div class="fg"><div class="fr"><label>Units sold</label><input id="s-qty" type="number" min="1" max="${i.stock}" value="1" oninput="document.getElementById('ds-tot').textContent='${R}'+Math.round(this.value*${i.price}).toLocaleString('en-LK')"/></div><div class="fr"><label>Total</label><div id="ds-tot" style="height:36px;display:flex;align-items:center;font-size:14px;font-weight:600">${fmt(i.price)}</div></div></div>
-    <div class="mf"><button onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="saveDS(${id})">Record</button></div>
+  showModal(`<div class="modal modal-sm">
+    <div class="mh"><h2>Record sale</h2><button class="abtn" onclick="closeModal()"><i class="ti ti-x"></i></button></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      ${i.photo?`<img src="${i.photo}" style="width:44px;height:44px;border-radius:var(--r);object-fit:cover" alt="${i.name}"/>`:''}
+      <div><div style="font-size:13px;font-weight:600">${i.name}</div><div style="font-size:12px;color:var(--text2)">${i.sku} - ${i.stock} units - ${fmt(i.price)} each</div></div>
+    </div>
+    <div class="fg">
+      <div class="fr"><label>Size</label><select id="s-size">${i.sizes.map(s=>`<option>${s}</option>`).join('')}</select></div>
+      <div class="fr"><label>Units sold</label><input id="s-qty" type="number" min="1" max="${i.stock}" value="1" oninput="calcDSTotal(${i.price})"/></div>
+    </div>
+    <div class="fg">
+      <div class="fr"><label style="color:#4caf80">Delivery customer pays (LKR)</label><input id="s-cus-delivery" type="number" min="0" value="0" placeholder="0" oninput="calcDSTotal(${i.price})" style="border-color:#4caf80"/></div>
+      <div class="fr"><label style="color:#e57373">Delivery YOU pay courier (LKR)</label><input id="s-delivery" type="number" min="0" value="0" placeholder="0" oninput="calcDSTotal(${i.price})" style="border-color:#e57373"/></div>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="color:var(--text2)">Items subtotal</span><span id="ds-subtot">${fmt(i.price)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="color:#4caf80">+ Customer delivery charge</span><span id="ds-cus-del" style="color:#4caf80">Rs. 0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:8px"><span>Grand total customer pays</span><span id="ds-tot" style="color:#4caf80">${fmt(i.price)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="color:#e57373">- Courier fee you pay</span><span id="ds-delfee" style="color:#e57373">Rs. 0</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:8px;border-top:1px solid rgba(255,255,255,0.15)"><span>Net you receive</span><span id="ds-net" style="color:#4caf80;font-size:17px">${fmt(i.price)}</span></div>
+    </div>
+    <div class="mf"><button onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="saveDS(${id})">Record sale</button></div>
   </div>`);
 }
 
@@ -981,15 +1056,21 @@ function delItem(id){inv=inv.filter(i=>i.id!==id);closeModal();lsSave();renderAl
 
 function calcDSTotal(unitPrice){
   const qty = parseInt(document.getElementById('s-qty')?.value)||1;
-  const del = parseFloat(document.getElementById('s-delivery')?.value)||0;
+  const cusDelivery = parseFloat(document.getElementById('s-cus-delivery')?.value)||0;
+  const myDelivery = parseFloat(document.getElementById('s-delivery')?.value)||0;
   const sub = qty * unitPrice;
-  const tot = sub + del;
-  const el1 = document.getElementById('ds-subtot');
-  const el2 = document.getElementById('ds-delfee');
-  const el3 = document.getElementById('ds-tot');
-  if(el1) el1.textContent = fmt(sub);
-  if(el2) el2.textContent = fmt(del);
-  if(el3) el3.textContent = fmt(tot);
+  const grandTotal = sub + cusDelivery;   // what customer pays
+  const netReceive = grandTotal - myDelivery; // what you actually keep
+  const e1=document.getElementById('ds-subtot');
+  const e2=document.getElementById('ds-cus-del');
+  const e3=document.getElementById('ds-tot');
+  const e4=document.getElementById('ds-delfee');
+  const e5=document.getElementById('ds-net');
+  if(e1) e1.textContent=fmt(sub);
+  if(e2) e2.textContent=fmt(cusDelivery);
+  if(e3) e3.textContent=fmt(grandTotal);
+  if(e4) e4.textContent=fmt(myDelivery);
+  if(e5) e5.textContent=fmt(netReceive);
 }
 
 function updST(){const sel=document.getElementById('s-item');if(!sel)return;const id=parseInt(sel.value);const qty=parseInt(document.getElementById('s-qty')?.value)||1;const i=inv.find(x=>x.id===id);const el=document.getElementById('s-total');if(el&&i)el.textContent=fmt(i.price*qty);}
@@ -1011,10 +1092,25 @@ async function saveSale(){
 }
 
 async function saveDS(id){
-  const qty=parseInt(document.getElementById('s-qty').value)||1;const size=document.getElementById('s-size').value;const color=document.getElementById('s-color').value;
-  const i=inv.find(x=>x.id===id);i.stock=Math.max(0,i.stock-qty);i.sold=(i.sold||0)+qty;
-  history.unshift({type:'sale',name:i.name,sku:i.sku,qty,size,color,total:qty*i.price,date:'Just now'});
-  closeModal();lsSave();renderAll();await checkAndAlert(i,'sale',qty);toast('Sale recorded ✓','ok');
+  const qty=parseInt(document.getElementById('s-qty')?.value)||1;
+  const cusDelivery=parseFloat(document.getElementById('s-cus-delivery')?.value)||0;
+  const myDelivery=parseFloat(document.getElementById('s-delivery')?.value)||0;
+  const size=document.getElementById('s-size')?.value||'';
+  const i=inv.find(x=>x.id===id);
+  i.stock=Math.max(0,i.stock-qty);
+  i.sold=(i.sold||0)+qty;
+  const itemTotal=qty*i.price;
+  const grandTotal=itemTotal+cusDelivery;
+  const netRevenue=grandTotal-myDelivery;
+  history.unshift({type:'sale',name:i.name,sku:i.sku,qty,size,color:'',total:grandTotal,cusDelivery,myDelivery,netRevenue,date:'Just now'});
+  loadFinances();
+  finances.unshift({id:Date.now(),type:'income',cat:'Sales revenue',amount:itemTotal,desc:'Sale: '+i.name+' x'+qty,date:new Date().toISOString().split('T')[0]});
+  if(cusDelivery>0) finances.unshift({id:Date.now()+1,type:'income',cat:'Delivery income',amount:cusDelivery,desc:'Delivery collected: '+i.name,date:new Date().toISOString().split('T')[0]});
+  if(myDelivery>0) finances.unshift({id:Date.now()+2,type:'expense',cat:'Delivery cost',amount:myDelivery,desc:'Courier fee: '+i.name,date:new Date().toISOString().split('T')[0]});
+  saveFinances();
+  closeModal();lsSave();renderAll();
+  toast('Sale recorded - Net you receive: '+fmt(netRevenue),'ok');
+  await checkAndAlert(i,'sale',qty);
 }
 
 async function saveRS(id){
@@ -1048,20 +1144,7 @@ function renderAll(){renderMetrics();renderTable();renderAlerts();}
 
 // ─── Init ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
-  // Clear old demo data from localStorage on fresh start
-  const savedInv = localStorage.getItem('sm_inv');
-  if(savedInv){
-    try{
-      const parsed = JSON.parse(savedInv);
-      // If it contains demo items like KC-001, wipe it
-      if(parsed.length && parsed[0] && parsed[0].sku && parsed[0].sku && parsed[0].sku.startsWith('KC-')){
-        localStorage.removeItem('sm_inv');
-        localStorage.removeItem('sm_hist');
-        localStorage.removeItem('sm_orders');
-        localStorage.removeItem('sm_notif');
-      }
-    }catch(e){}
-  }
+  // Data is preserved in localStorage across refreshes
   lsLoad();
   const urlEl=document.getElementById('gs-url');
   if(urlEl&&gsUrl)urlEl.value=gsUrl;
@@ -1149,46 +1232,56 @@ function renderFinance(){
 
 // ── Customer Orders ───────────────────────────────────────────
 let cusOrders = [];
-function loadCusOrders(){ try{ cusOrders=JSON.parse(localStorage.getItem('sm_co')||'[]'); }catch(e){ cusOrders=[]; } }
-function saveCusOrders(){ localStorage.setItem('sm_co', JSON.stringify(cusOrders)); }
+
+function saveCusOrders(){
+  localStorage.setItem('sm_co', JSON.stringify(cusOrders));
+}
 
 function openCOModal(){
-  const itemOptions = inv.map(i=>`<option value="${i.id}">${i.name} (stock: ${i.stock}) - ${fmt(i.price)}</option>`).join('');
-  showModal(`<div class="modal">
-    <div class="mh"><h2 style="display:flex;align-items:center;gap:8px"><i class="ti ti-package"></i> New customer order</h2><button class="abtn" onclick="closeModal()"><i class="ti ti-x"></i></button></div>
-
-    <div style="background:var(--surface2);border-radius:var(--r);padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text2)">
-      <i class="ti ti-info-circle" style="vertical-align:-2px"></i> Order is saved as <b>Pending</b>. Mark as <b>Delivered</b> to auto-record in sales. Mark as <b>Returned</b> if parcel comes back.
-    </div>
-
-    <div class="fg">
-      <div class="fr"><label>Customer name *</label><input id="co-name" placeholder="e.g. Nimal Perera" style="width:100%"/></div>
-      <div class="fr"><label>Phone number</label><input id="co-phone" placeholder="+94771234567 (optional)" style="width:100%"/></div>
-    </div>
-    <div class="fr"><label>Delivery address</label><input id="co-addr" placeholder="Address (optional)" style="width:100%"/></div>
-
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;margin-bottom:14px">
-      <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Order items</div>
-      <div id="co-items-wrap">
-        <div class="co-item-row fg3" style="margin-bottom:8px;gap:8px">
-          <select class="co-item-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">${itemOptions}</select>
-          <div style="display:flex;flex-direction:column"><label style="font-size:10px;color:var(--text2);margin-bottom:3px">SIZE</label><select class="co-size-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">${SIZES.map(s=>`<option>${s}</option>`).join('')}</select></div>
-          <div style="display:flex;flex-direction:column"><label style="font-size:10px;color:var(--text2);margin-bottom:3px">QTY</label><input type="number" class="co-qty-inp" min="1" value="1" style="font-size:13px;width:100%"/></div>
-        </div>
-      </div>
-      <button onclick="addCOItemRow()" style="font-size:12px;padding:4px 12px;margin-bottom:4px"><i class="ti ti-plus"></i> Add item</button>
-    </div>
-
-    <div class="fg">
-      <div class="fr"><label>Delivery charge (LKR)</label><input id="co-delivery" type="number" min="0" value="0" oninput="calcCOTotal()" style="width:100%"/></div>
-      <div class="fr"><label>Grand total (LKR)</label><div id="co-total-display" style="height:36px;display:flex;align-items:center;font-size:15px;font-weight:700;color:var(--green)">Rs. 0</div></div>
-    </div>
-    <div class="fr"><label>Notes</label><textarea id="co-notes" rows="2" placeholder="Any special instructions..." style="width:100%"></textarea></div>
-
-    <div class="mf"><button onclick="closeModal()">Cancel</button><button onclick="saveCusOrder()" style="background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:13px;font-weight:600;cursor:pointer"><i class="ti ti-check"></i> Save order</button></div>
-  </div>`);
-  setTimeout(()=>{ setupCOItemListeners(); calcCOTotal(); },80);
+  var itemOptions='';
+  for(var i=0;i<inv.length;i++){
+    itemOptions+='<option value="'+inv[i].id+'">'+inv[i].name+' (stock: '+inv[i].stock+') - '+fmt(inv[i].price)+'</option>';
+  }
+  var sizeOptions='';
+  for(var s=0;s<SIZES.length;s++) sizeOptions+='<option>'+SIZES[s]+'</option>';
+  
+  showModal('<div class="modal">'
+    +'<div class="mh"><h2>New customer order</h2><button class="abtn" onclick="closeModal()"><i class="ti ti-x"></i></button></div>'
+    +'<div style="background:var(--surface2);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text2)">Order saved as Pending. Mark as Delivered to auto-record sale.</div>'
+    +'<div class="fg">'
+      +'<div class="fr"><label>Customer name *</label><input id="co-name" placeholder="e.g. Nimal Perera"/></div>'
+      +'<div class="fr"><label>Phone number</label><input id="co-phone" placeholder="+94771234567 (optional)"/></div>'
+    +'</div>'
+    +'<div class="fr"><label>Delivery address</label><input id="co-addr" placeholder="Address (optional)"/></div>'
+    +'<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;margin-bottom:14px">'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Order items</div>'
+      +'<div id="co-items-wrap">'
+        +'<div class="co-item-row" style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+          +'<select class="co-item-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">'+itemOptions+'</select>'
+          +'<select class="co-size-sel" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 8px;background:var(--surface);color:var(--text)">'+sizeOptions+'</select>'
+          +'<input type="number" class="co-qty-inp" min="1" value="1" placeholder="Qty" oninput="calcCOTotal()" style="font-size:13px;border:1px solid var(--border2);border-radius:var(--r);padding:7px 10px;background:var(--surface);color:var(--text)"/>'
+        +'</div>'
+      +'</div>'
+      +'<button onclick="addCOItemRow()" style="font-size:12px;padding:4px 12px;margin-bottom:4px"><i class="ti ti-plus"></i> Add item</button>'
+    +'</div>'
+    +'<div class="fg">'
+      +'<div class="fr"><label style="color:#4caf80">Delivery customer pays (LKR)</label><input id="co-delivery" type="number" min="0" value="0" oninput="calcCOTotal()" style="border-color:#4caf80"/></div>'
+      +'<div class="fr"><label style="color:var(--red)">Delivery YOU pay courier (LKR)</label><input id="co-my-delivery" type="number" min="0" value="0" oninput="calcCOTotal()" style="border-color:var(--red)"/></div>'
+    +'</div>'
+    +'<div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:var(--r);padding:10px 14px;margin-bottom:14px">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Items subtotal</span><span id="co-sub-display">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#4caf80">+ Customer delivery</span><span id="co-cus-del-display" style="color:#4caf80">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:8px"><span>Grand total</span><span id="co-total-display" style="color:#4caf80">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--red)">- Courier fee</span><span id="co-my-del-display" style="color:var(--red)">Rs. 0</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700"><span>Net you receive</span><span id="co-net-display" style="color:#4caf80">Rs. 0</span></div>'
+    +'</div>'
+    +'<div class="fr"><label>Notes</label><textarea id="co-notes" rows="2" placeholder="Any special instructions..."></textarea></div>'
+    +'<div class="mf"><button onclick="closeModal()">Cancel</button><button onclick="saveCusOrder()" style="background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:13px;font-weight:600;cursor:pointer">Save order</button></div>'
+  +'</div>');
+  setTimeout(function(){ setupCOItemListeners(); calcCOTotal(); }, 80);
 }
+
+function loadCusOrders(){ try{ cusOrders=JSON.parse(localStorage.getItem('sm_co')||'[]'); }catch(e){ cusOrders=[]; } }
 
 function addCOItemRow(){
   const wrap = document.getElementById('co-items-wrap');
@@ -1217,10 +1310,20 @@ function calcCOTotal(){
     const qty=parseInt(row.querySelector('.co-qty-inp')?.value)||1;
     if(sel){const item=inv.find(i=>i.id===parseInt(sel.value));if(item)sub+=item.price*qty;}
   });
-  const del=parseFloat(document.getElementById('co-delivery')?.value)||0;
-  const tot=sub+del;
-  const el=document.getElementById('co-total-display');
-  if(el) el.textContent=fmt(tot);
+  const cusDelivery=parseFloat(document.getElementById('co-delivery')?.value)||0;
+  const myDelivery=parseFloat(document.getElementById('co-my-delivery')?.value)||0;
+  const grandTotal=sub+cusDelivery;
+  const netReceive=grandTotal-myDelivery;
+  const e1=document.getElementById('co-sub-display');
+  const e2=document.getElementById('co-cus-del-display');
+  const e3=document.getElementById('co-total-display');
+  const e4=document.getElementById('co-my-del-display');
+  const e5=document.getElementById('co-net-display');
+  if(e1)e1.textContent=fmt(sub);
+  if(e2)e2.textContent=fmt(cusDelivery);
+  if(e3)e3.textContent=fmt(grandTotal);
+  if(e4)e4.textContent=fmt(myDelivery);
+  if(e5)e5.textContent=fmt(netReceive);
 }
 
 function saveCusOrder(){
@@ -1230,6 +1333,7 @@ function saveCusOrder(){
   const addr=document.getElementById('co-addr')?.value.trim()||'';
   const notes=document.getElementById('co-notes')?.value.trim()||'';
   const del=parseFloat(document.getElementById('co-delivery')?.value)||0;
+  const myDel=parseFloat(document.getElementById('co-my-delivery')?.value)||0;
 
   const items=[];
   document.querySelectorAll('.co-item-row').forEach(row=>{
@@ -1245,12 +1349,13 @@ function saveCusOrder(){
 
   const subTotal=items.reduce((a,b)=>a+b.total,0);
   const grandTotal=subTotal+del;
+  const netTotal=grandTotal-myDel;
   const now=new Date();
   const orderId='ORD-'+String(Date.now()).slice(-6);
 
   cusOrders.unshift({
     id:orderId, customer:name, phone, address:addr, notes,
-    items, delivery:del, subTotal, grandTotal,
+    items, delivery:del, myDelivery:myDel, subTotal, grandTotal, netTotal,
     status:'pending',
     date:now.toLocaleDateString('en-LK'),
     time:now.toLocaleTimeString('en-LK')
@@ -1263,53 +1368,8 @@ function saveCusOrder(){
   toast(`Order ${orderId} saved for ${name} ✓`,'ok');
 }
 
-function markCODelivered(id){
-  const o=cusOrders.find(x=>x.id===id);if(!o)return;
-  if(!confirm(`Mark order ${id} as DELIVERED?\n\nThis will automatically record the sale and reduce stock for all items.`))return;
 
-  o.status='delivered';
-  o.deliveredDate=new Date().toLocaleDateString('en-LK');
 
-  // Auto-record in sales history and reduce stock
-  o.items.forEach(oi=>{
-    const item=inv.find(i=>i.id===oi.itemId);
-    if(item){
-      item.stock=Math.max(0,item.stock-oi.qty);
-      item.sold=(item.sold||0)+oi.qty;
-      history.unshift({type:'sale',name:item.name,sku:item.sku,qty:oi.qty,size:oi.size,color:'',total:oi.total,delivery:0,date:'Just now ('+o.customer+')'});
-    }
-  });
-  // Record delivery income in finance
-  if(o.delivery>0){
-    loadFinances();
-    finances.unshift({id:Date.now(),type:'income',cat:'Delivery income',amount:o.delivery,desc:'Delivery: Order '+id+' ('+o.customer+')',date:new Date().toISOString().split('T')[0]});
-    saveFinances();
-  }
-  // Record sale income in finance
-  loadFinances();
-  finances.unshift({id:Date.now()+1,type:'income',cat:'Sales revenue',amount:o.subTotal,desc:'Sale: Order '+id+' ('+o.customer+')',date:new Date().toISOString().split('T')[0]});
-  saveFinances();
-
-  lsSave();saveCusOrders();
-  renderAll();renderCusOrders();renderCOMetrics();updateCOBadge();
-  toast('Order marked delivered & sale recorded ✓','ok');
-}
-
-function markCOReturned(id){
-  const o=cusOrders.find(x=>x.id===id);if(!o)return;
-  if(!confirm(`Mark order ${id} as RETURNED?\n\nStock will NOT be affected. The order will be marked as returned.`))return;
-  o.status='returned';
-  o.returnedDate=new Date().toLocaleDateString('en-LK');
-  saveCusOrders();renderCusOrders();renderCOMetrics();updateCOBadge();
-  toast('Order marked as returned','ok');
-}
-
-function deleteCusOrder(id){
-  if(!confirm('Delete this order? This cannot be undone.'))return;
-  cusOrders=cusOrders.filter(x=>x.id!==id);
-  saveCusOrders();renderCusOrders();renderCOMetrics();updateCOBadge();
-  toast('Order deleted','ok');
-}
 
 function updateCOBadge(){
   const pending=cusOrders.filter(o=>o.status==='pending').length;
@@ -1331,59 +1391,131 @@ function renderCOMetrics(){
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Revenue</div><div style="font-size:18px;font-weight:600;color:var(--green)">${fmt(revenue)}</div><div style="font-size:11px;color:var(--text2)">from delivered</div></div>`;
 }
 
+
+function coDo_deliver(id){
+  var o=null;
+  for(var i=0;i<cusOrders.length;i++){ if(cusOrders[i].id===id){o=cusOrders[i];break;} }
+  if(!o){ alert('Order not found: '+id); return; }
+  if(o.status==='delivered'){ alert('Already delivered'); return; }
+  if(!confirm('Mark order '+id+' for '+o.customer+' as DELIVERED?\n\nThis will:\n- Record the sale automatically\n- Reduce stock for all items\n- Add to Finance')) return;
+  o.status='delivered';
+  o.deliveredDate=new Date().toLocaleDateString('en-LK');
+  for(var ii=0;ii<(o.items||[]).length;ii++){
+    var oi=o.items[ii];
+    var item=null;
+    for(var j=0;j<inv.length;j++){ if(inv[j].id===oi.itemId){item=inv[j];break;} }
+    if(item){
+      item.stock=Math.max(0,item.stock-oi.qty);
+      item.sold=(item.sold||0)+oi.qty;
+      history.unshift({type:'sale',name:item.name,sku:item.sku,qty:oi.qty,size:oi.size||'',color:'',total:oi.total||0,netRevenue:oi.total||0,date:'Just now ('+o.customer+')'});
+    }
+  }
+  loadFinances();
+  var d=new Date().toISOString().split('T')[0];
+  finances.unshift({id:Date.now(),type:'income',cat:'Sales revenue',amount:o.subTotal||0,desc:'Order '+id+' - '+o.customer,date:d});
+  if((o.delivery||0)>0) finances.unshift({id:Date.now()+1,type:'income',cat:'Delivery income',amount:o.delivery,desc:'Delivery for Order '+id,date:d});
+  if((o.myDelivery||0)>0) finances.unshift({id:Date.now()+2,type:'expense',cat:'Delivery cost',amount:o.myDelivery,desc:'Courier for Order '+id,date:d});
+  saveFinances();
+  lsSave(); saveCusOrders();
+  renderAll(); renderCusOrders(); renderCOMetrics(); updateCOBadge();
+  toast('Order delivered! Sale recorded ✓','ok');
+}
+
+function coDo_return(id){
+  var o=null;
+  for(var i=0;i<cusOrders.length;i++){ if(cusOrders[i].id===id){o=cusOrders[i];break;} }
+  if(!o) return;
+  if(!confirm('Mark order '+id+' for '+o.customer+' as RETURNED?\nStock will not be changed.')) return;
+  o.status='returned';
+  o.returnedDate=new Date().toLocaleDateString('en-LK');
+  saveCusOrders(); renderCusOrders(); renderCOMetrics(); updateCOBadge();
+  toast('Order marked as returned','ok');
+}
+
+function coDo_delete(id){
+  var o=null;
+  for(var i=0;i<cusOrders.length;i++){ if(cusOrders[i].id===id){o=cusOrders[i];break;} }
+  if(!o) return;
+  if(!confirm('Delete order '+id+' for '+o.customer+'?\nThis cannot be undone.')) return;
+  cusOrders=cusOrders.filter(function(x){ return x.id!==id; });
+  saveCusOrders(); renderCusOrders(); renderCOMetrics(); updateCOBadge();
+  toast('Order deleted','ok');
+}
+
 function renderCusOrders(){
   const fstatus=document.getElementById('co-fstatus')?.value||'';
   const srch=(document.getElementById('co-srch')?.value||'').toLowerCase();
-  let recs=cusOrders.filter(o=>{
-    if(fstatus&&o.status!==fstatus)return false;
-    if(srch&&!(o.customer+o.phone+o.id).toLowerCase().includes(srch))return false;
+  let recs=cusOrders.filter(function(o){
+    if(fstatus && o.status!==fstatus) return false;
+    if(srch && !(o.customer+(o.phone||'')+(o.id||'')).toLowerCase().includes(srch)) return false;
     return true;
   });
-  const el=document.getElementById('co-list');if(!el)return;
+  var el=document.getElementById('co-list');
+  if(!el) return;
   if(!recs.length){
-    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)"><i class="ti ti-package" style="font-size:28px;display:block;margin-bottom:8px"></i>No orders yet. Click "New customer order" to get started.</div>';
-    renderCOMetrics();return;
+    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)"><i class="ti ti-package" style="font-size:28px;display:block;margin-bottom:8px"></i>No orders yet.</div>';
+    renderCOMetrics(); return;
   }
-  const statusStyles={
-    pending:{bg:'var(--amber-bg)',color:'var(--amber)',label:'⏳ Pending'},
-    delivered:{bg:'var(--green-bg)',color:'var(--green)',label:'✅ Delivered'},
-    returned:{bg:'var(--red-bg)',color:'var(--red)',label:'↩ Returned'}
+  var html2='';
+  for(var ri=0;ri<recs.length;ri++){
+    var o=recs[ri];
+    var statusBg = o.status==='delivered'?'var(--green-bg)':o.status==='returned'?'var(--red-bg)':'var(--amber-bg)';
+    var statusColor = o.status==='delivered'?'var(--green)':o.status==='returned'?'var(--red)':'var(--amber)';
+    var statusLabel = o.status==='delivered'?'✅ Delivered':o.status==='returned'?'↩ Returned':'⏳ Pending';
+    var itemRows='';
+    for(var ii=0;ii<(o.items||[]).length;ii++){
+      var it=o.items[ii];
+      itemRows+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>'+it.name+(it.size?' ('+it.size+')':'')+' x'+it.qty+'</span><span style="font-weight:600">'+fmt(it.total||0)+'</span></div>';
+    }
+    var actionBtns='';
+    if(o.status==='pending'){
+      actionBtns='<button data-oid="'+o.id+'" data-act="deliver" style="font-size:12px;padding:7px 16px;background:#1d7a4f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">✅ Mark delivered</button>'
+               +'<button data-oid="'+o.id+'" data-act="return" style="font-size:12px;padding:7px 16px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">↩ Mark returned</button>';
+    } else if(o.status==='delivered'){
+      actionBtns='<span style="font-size:12px;color:#4caf80;margin-right:6px">✅ Delivered '+( o.deliveredDate||'')+' — sale recorded</span>';
+    } else {
+      actionBtns='<span style="font-size:12px;color:var(--red);margin-right:6px">↩ Returned '+(o.returnedDate||'')+'</span>';
+    }
+    actionBtns+='<button data-oid="'+o.id+'" data-act="delete" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto">🗑 Delete</button>';
+
+    html2+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'
+        +'<div>'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
+            +'<span style="font-size:14px;font-weight:700">'+o.customer+'</span>'
+            +'<span style="font-family:monospace;font-size:11px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px">'+o.id+'</span>'
+            +'<span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;background:'+statusBg+';color:'+statusColor+'">'+statusLabel+'</span>'
+          +'</div>'
+          +(o.phone?'<div style="font-size:12px;color:var(--text2)">📞 '+o.phone+(o.address?' &nbsp;📍 '+o.address:'')+'</div>':'')
+          +'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+o.date+' '+(o.time||'')+'</div>'
+        +'</div>'
+        +'<div style="text-align:right">'
+          +'<div style="font-size:18px;font-weight:700;color:var(--green)">'+fmt(o.grandTotal||0)+'</div>'
+          +'<div style="font-size:11px;color:#4caf80">Net: '+fmt(o.netTotal||o.grandTotal||0)+'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div style="background:var(--surface2);border-radius:var(--r);padding:10px;margin-bottom:10px">'
+        +itemRows
+        +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>Items subtotal</span><span>'+fmt(o.subTotal||0)+'</span></div>'
+        +(o.delivery>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4caf80">+ Delivery charged</span><span style="color:#4caf80">'+fmt(o.delivery)+'</span></div>':'')
+        +(( o.myDelivery||0)>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">- Courier fee</span><span style="color:var(--red)">'+fmt(o.myDelivery)+'</span></div>':'')
+        +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px;color:#4caf80"><span>💰 Net you receive</span><span>'+fmt(o.netTotal||o.grandTotal||0)+'</span></div>'
+      +'</div>'
+      +(o.notes?'<div style="font-size:12px;color:var(--text2);margin-bottom:10px">📝 '+o.notes+'</div>':'')
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+actionBtns+'</div>'
+    +'</div>';
+  }
+  el.innerHTML=html2;
+  // Event delegation for all buttons in list
+  el.onclick=function(e){
+    var btn=e.target.closest('[data-act]');
+    if(!btn) return;
+    var act=btn.getAttribute('data-act');
+    var oid=btn.getAttribute('data-oid');
+    if(act==='deliver') coDo_deliver(oid);
+    else if(act==='return') coDo_return(oid);
+    else if(act==='delete') coDo_delete(oid);
   };
-  el.innerHTML=recs.map(o=>{
-    const s=statusStyles[o.status]||statusStyles.pending;
-    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-        <div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-            <span style="font-size:14px;font-weight:700">${o.customer}</span>
-            <span style="font-family:monospace;font-size:11px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px">${o.id}</span>
-            <span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;background:${s.bg};color:${s.color}">${s.label}</span>
-          </div>
-          <div style="font-size:12px;color:var(--text2)">${o.phone?'📞 '+o.phone:''} ${o.address?'&nbsp;📍 '+o.address:''}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">${o.date} ${o.time}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:18px;font-weight:700;color:var(--green)">${fmt(o.grandTotal)}</div>
-          ${o.delivery>0?`<div style="font-size:11px;color:var(--text2)">incl. delivery ${fmt(o.delivery)}</div>`:''}
-        </div>
-      </div>
-      <div style="background:var(--surface2);border-radius:var(--r);padding:10px;margin-bottom:10px">
-        ${o.items.map(it=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>${it.name} ${it.size?'('+it.size+')':''} ×${it.qty}</span><span style="font-weight:600">${fmt(it.total)}</span></div>`).join('')}
-        <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px"><span>Subtotal</span><span>${fmt(o.subTotal)}</span></div>
-        ${o.delivery>0?`<div style="display:flex;justify-content:space-between;font-size:12px"><span>Delivery</span><span>${fmt(o.delivery)}</span></div>`:''}
-      </div>
-      ${o.notes?`<div style="font-size:12px;color:var(--text2);margin-bottom:10px;font-style:italic">📝 ${o.notes}</div>`:''}
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${o.status==='pending'?`
-          <button onclick="markCODelivered('${o.id}')" style="font-size:12px;padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">✅ Mark delivered</button>
-          <button onclick="markCOReturned('${o.id}')" style="font-size:12px;padding:6px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600">↩ Mark returned</button>
-        `:''}
-        ${o.status==='delivered'?`<div style="font-size:12px;color:var(--green);padding:6px 0">✅ Delivered on ${o.deliveredDate||o.date} — sale recorded automatically</div>`:''}
-        ${o.status==='returned'?`<div style="font-size:12px;color:var(--red);padding:6px 0">↩ Returned on ${o.returnedDate||o.date}</div>`:''}
-        <button onclick="deleteCusOrder('${o.id}')" style="font-size:12px;padding:6px 12px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto">🗑 Delete</button>
-      </div>
-    </div>`;
-  }).join('');
   renderCOMetrics();
 }
 
