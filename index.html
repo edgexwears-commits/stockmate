@@ -297,7 +297,7 @@ tr:hover td{background:var(--surface2)}
     <div style="position:relative;width:100%;height:170px"><canvas id="schart" role="img" aria-label="Sales bar chart last 7 days"></canvas></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Revenue vs cost</div><div style="position:relative;width:100%;height:240px"><canvas id="rchart" role="img" aria-label="Revenue vs cost bar"></canvas></div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Revenue vs cost</div><div style="position:relative;width:100%;height:260px"><canvas id="rchart" role="img" aria-label="Revenue vs cost bar"></canvas></div></div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Margin by item (top 5)</div><div id="mlist"></div></div>
   </div>
 </div>
@@ -603,34 +603,76 @@ function renderMetrics(){
 
 // ─── Inventory table ──────────────────────────────────────────
 function renderTable(){
-  const q=document.getElementById('srch').value.toLowerCase();
-  const cat=document.getElementById('fcat').value;
-  const gen=document.getElementById('fgen').value;
-  const sort=document.getElementById('fsort').value;
-  let rows=inv.filter(i=>(!q||(i.name+i.sku+i.cat).toLowerCase().includes(q))&&(!cat||i.cat===cat)&&(!gen||i.gender===gen));
-  if(sort==='stock_asc')rows.sort((a,b)=>a.stock-b.stock);
-  else if(sort==='stock_desc')rows.sort((a,b)=>b.stock-a.stock);
-  else if(sort==='price_asc')rows.sort((a,b)=>a.price-b.price);
-  else if(sort==='val_desc')rows.sort((a,b)=>(b.stock*b.price)-(a.stock*a.price));
-  else rows.sort((a,b)=>a.name.localeCompare(b.name));
-  const tbody=document.getElementById('inv-body');
-  if(!rows.length){tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--text2)">No items found.</td></tr>';return;}
-  tbody.innerHTML=rows.map(i=>`<tr>
-    <td style="padding:6px 8px">${photoThumb(i)}</td>
-    <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${i.sku}</td>
-    <td style="font-weight:500">${i.name}</td>
-    <td><span style="font-size:11px;background:var(--surface2);padding:2px 7px;border-radius:4px">${i.cat}</span></td>
-    <td style="font-size:11px;color:var(--text2)">${i.sizes.join(', ')}</td>
-    <td>${colorDots(i.colors)}</td>
-    <td style="font-weight:500;${i.stock===0?'color:var(--red)':i.stock<=i.low?'color:var(--amber)':''}">${i.stock}</td>
-    <td style="font-size:12px;color:var(--text2)">${fmt(i.cost)}</td>
-    <td style="font-size:12px;font-weight:500">${fmt(i.price)}</td>
-    <td style="font-size:12px;color:#f953c6;font-weight:500">${i.wholesale?fmt(i.wholesale):'-'}</td>
-    <td>${stockBadge(i)}</td>
-    <td style="padding:6px 8px;white-space:nowrap"><button onclick="confirmDel(${i.id})" style="font-size:13px;padding:6px 12px;background:#c0392b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:5px">🗑 Delete</button><button onclick="openEdit(${i.id})" style="font-size:13px;padding:6px 12px;background:#1a5fa8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">✏️ Edit</button></td>
-  </tr>`).join('');
-  const tv=rows.reduce((a,b)=>a+(b.stock*b.price),0);
-  document.getElementById('inv-footer').textContent=`${rows.length} of ${inv.length} items · ${rows.reduce((a,b)=>a+b.stock,0)} units · Value: ${fmt(tv)}`;
+  var q=document.getElementById('srch').value.toLowerCase();
+  var cat=document.getElementById('fcat').value;
+  var gen=document.getElementById('fgen').value;
+  var sort=document.getElementById('fsort').value;
+  var rows=inv.filter(function(i){
+    return (!q||(i.name+i.sku+i.cat).toLowerCase().includes(q))&&(!cat||i.cat===cat)&&(!gen||i.gender===gen);
+  });
+  if(sort==='stock_asc')rows.sort(function(a,b){return a.stock-b.stock;});
+  else if(sort==='stock_desc')rows.sort(function(a,b){return b.stock-a.stock;});
+  else if(sort==='price_asc')rows.sort(function(a,b){return a.price-b.price;});
+  else if(sort==='val_desc')rows.sort(function(a,b){return (b.stock*b.price)-(a.stock*a.price);});
+  else rows.sort(function(a,b){return a.name.localeCompare(b.name);});
+  var tbody=document.getElementById('inv-body');
+  tbody.innerHTML='';
+  if(!rows.length){
+    var empty=document.createElement('tr');
+    empty.innerHTML='<td colspan="11" style="text-align:center;padding:2rem;color:var(--text2)">No items found. Click Add item to get started.</td>';
+    tbody.appendChild(empty);
+    document.getElementById('inv-footer').textContent='';
+    return;
+  }
+  for(var ri=0;ri<rows.length;ri++){
+    var i=rows[ri];
+    var tr=document.createElement('tr');
+    // Photo
+    var tdPhoto=document.createElement('td');tdPhoto.style.padding='6px 8px';
+    if(i.photo){var img=document.createElement('img');img.src=i.photo;img.style.cssText='width:34px;height:34px;border-radius:8px;object-fit:cover;border:1px solid var(--border)';img.alt=i.name;tdPhoto.appendChild(img);}
+    else{tdPhoto.innerHTML='<div style="width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text3)"><i class=\"ti ti-photo\"></i></div>';}
+    tr.appendChild(tdPhoto);
+    // SKU
+    var tdSku=document.createElement('td');tdSku.style.cssText='font-family:var(--mono);font-size:11px;color:var(--text2)';tdSku.textContent=i.sku||'';tr.appendChild(tdSku);
+    // Name
+    var tdName=document.createElement('td');tdName.style.fontWeight='500';tdName.textContent=i.name||'';tr.appendChild(tdName);
+    // Cat
+    var tdCat=document.createElement('td');tdCat.innerHTML='<span style="font-size:11px;background:var(--surface2);padding:2px 7px;border-radius:4px">'+i.cat+'</span>';tr.appendChild(tdCat);
+    // Sizes
+    var tdSizes=document.createElement('td');tdSizes.style.cssText='font-size:11px;color:var(--text2)';tdSizes.textContent=(i.sizes||[]).join(', ');tr.appendChild(tdSizes);
+    // Colors
+    var tdColors=document.createElement('td');
+    var dots='';for(var ci=0;ci<(i.colors||[]).length;ci++){dots+='<span style="width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:2px;border:1px solid rgba(0,0,0,.1);background:'+(COLS[i.colors[ci]]||'#aaa')+'" title="'+i.colors[ci]+'"></span>';}
+    tdColors.innerHTML=dots+'<span style="font-size:11px;color:var(--text2)">'+(i.colors||[]).join(', ')+'</span>';tr.appendChild(tdColors);
+    // Stock
+    var tdStock=document.createElement('td');tdStock.style.fontWeight='500';
+    if(i.stock===0)tdStock.style.color='var(--red)';else if(i.stock<=i.low)tdStock.style.color='var(--amber)';
+    tdStock.textContent=i.stock;tr.appendChild(tdStock);
+    // Cost
+    var tdCost=document.createElement('td');tdCost.style.cssText='font-size:12px;color:var(--text2)';tdCost.textContent=fmt(i.cost);tr.appendChild(tdCost);
+    // Price
+    var tdPrice=document.createElement('td');tdPrice.style.cssText='font-size:12px;font-weight:500';tdPrice.textContent=fmt(i.price);tr.appendChild(tdPrice);
+    // Status
+    var tdStatus=document.createElement('td');tdStatus.innerHTML=stockBadge(i);tr.appendChild(tdStatus);
+    // Action buttons - using addEventListener (NO onclick strings)
+    var tdAct=document.createElement('td');tdAct.style.cssText='padding:6px 8px;white-space:nowrap';
+    // Delete button
+    var btnDel=document.createElement('button');
+    btnDel.textContent='🗑 Delete';
+    btnDel.style.cssText='font-size:12px;padding:6px 12px;background:#c0392b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:5px';
+    (function(itemId){btnDel.addEventListener('click',function(){confirmDel(itemId);});})(i.id);
+    tdAct.appendChild(btnDel);
+    // Edit button
+    var btnEdit=document.createElement('button');
+    btnEdit.textContent='✏️ Edit';
+    btnEdit.style.cssText='font-size:12px;padding:6px 12px;background:#1a5fa8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600';
+    (function(itemId){btnEdit.addEventListener('click',function(){openEdit(itemId);});})(i.id);
+    tdAct.appendChild(btnEdit);
+    tr.appendChild(tdAct);
+    tbody.appendChild(tr);
+  }
+  var tv=rows.reduce(function(a,b){return a+(b.stock*b.price);},0);
+  document.getElementById('inv-footer').textContent=rows.length+' of '+inv.length+' items - '+rows.reduce(function(a,b){return a+b.stock;},0)+' units - Value: '+fmt(tv);
 }
 
 // ─── Catalogue ────────────────────────────────────────────────
@@ -834,26 +876,27 @@ function renderAnalytics(){
   if(rchartEl){
     const chartRevenue = totalRevenue || sRev || 0;
     const chartExpenses = totalExpenses || sCost || 0;
-    const chartStockVal = totalCost || sVal || 0;
+    const chartStockRetail = totalStockRetail || 0;
+      const chartStockCost = totalCost || 0;
     const chartProfit = chartRevenue - chartExpenses;
-    if(!chartRevenue && !chartExpenses && !chartStockVal){
+    if(!chartRevenue && !chartExpenses && !chartStockRetail && !chartStockCost){
       rchartEl.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:140px;color:var(--text2);font-size:13px;flex-direction:column;gap:8px"><i class="ti ti-chart-bar" style="font-size:28px;opacity:.3"></i><span>No financial data yet</span></div>';
     } else {
       if(charts.r)charts.r.destroy();
       // Smart tick formatter - handles up to millions
-      const maxVal = Math.max(chartRevenue, chartExpenses, chartStockVal, chartStockCost, Math.abs(chartProfit));
+      const maxVal = Math.max(chartRevenue, chartExpenses, chartStockRetail, chartStockCost, Math.abs(chartProfit));
       const tickFmt = v => {
         if(v>=1000000) return 'Rs.'+(v/1000000).toFixed(1)+'M';
         if(v>=1000) return 'Rs.'+(v/1000).toFixed(0)+'k';
         return 'Rs.'+v;
       };
-      const maxVal2 = Math.max(chartRevenue, chartExpenses, chartStockVal, chartStockCost, Math.abs(chartProfit));
+      const maxVal2 = Math.max(chartRevenue, chartExpenses, chartStockRetail, chartStockCost, Math.abs(chartProfit));
       charts.r=new Chart(rchartEl,{
         type:'bar',
         data:{
           labels:['Net Revenue','Stock Value (Retail)','Stock Value (Cost)','Total Expenses','Net Profit'],
           datasets:[{
-            data:[chartRevenue, chartStockVal, chartStockCost, chartExpenses, chartProfit],
+            data:[chartRevenue, chartStockRetail, chartStockCost, chartExpenses, chartProfit],
             backgroundColor:['#4caf80','#7F77DD','#9c6fe0','#e57373', chartProfit>=0?'#4caf80':'#e57373'],
             borderRadius:4
           }]
@@ -869,10 +912,16 @@ function renderAnalytics(){
           scales:{
             x:{
               grid:{color:'rgba(255,255,255,.08)'},
-              ticks:{font:{size:10},color:'rgba(255,255,255,.5)',callback:tickFmt},
-              suggestedMax: Math.max(maxVal2*1.15, 100000)
+              ticks:{
+              font:{size:11},
+              color:'rgba(255,255,255,.65)',
+              callback:tickFmt,
+              maxTicksLimit:8
             },
-            y:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.7)'}}
+              suggestedMax: maxVal * 1.2,
+              min: 0
+            },
+            y:{grid:{display:false},ticks:{font:{size:12,weight:'500'},color:'rgba(255,255,255,.8)'}}
           }
         }
       });
