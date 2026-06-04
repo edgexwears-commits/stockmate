@@ -297,7 +297,7 @@ tr:hover td{background:var(--surface2)}
     <div style="position:relative;width:100%;height:170px"><canvas id="schart" role="img" aria-label="Sales bar chart last 7 days"></canvas></div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Revenue vs cost</div><div style="position:relative;width:100%;height:200px"><canvas id="rchart" role="img" aria-label="Revenue vs cost bar"></canvas></div></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Revenue vs cost</div><div style="position:relative;width:100%;height:240px"><canvas id="rchart" role="img" aria-label="Revenue vs cost bar"></canvas></div></div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px"><div class="slabel">Margin by item (top 5)</div><div id="mlist"></div></div>
   </div>
 </div>
@@ -763,7 +763,8 @@ function renderAnalytics(){
   const totalRevFromSales = allSales.reduce((a,b)=>a+(b.netRevenue!==undefined?b.netRevenue:b.total||0),0);
   const totalRevFromOrders = deliveredOrders.reduce((a,b)=>a+(b.netTotal||b.grandTotal||0),0);
   const totalRevenue = totalRevFromSales + totalRevFromOrders;
-  const totalCost = inv.reduce((a,b)=>a+(b.stock*b.cost),0);
+  const totalCost = inv.reduce((a,b)=>a+(b.stock*b.cost),0);   // stock at cost price
+  const totalStockRetail = inv.reduce((a,b)=>a+(b.stock*b.price),0); // stock at retail (matches metrics)
   const totalExpenses = (typeof finances!=='undefined'?finances:[]).filter(f=>f.type==='expense').reduce((a,b)=>a+b.amount,0);
 
   // Period summary
@@ -840,19 +841,20 @@ function renderAnalytics(){
     } else {
       if(charts.r)charts.r.destroy();
       // Smart tick formatter - handles up to millions
-      const maxVal = Math.max(chartRevenue, chartExpenses, chartStockVal, chartProfit);
+      const maxVal = Math.max(chartRevenue, chartExpenses, chartStockVal, chartStockCost, Math.abs(chartProfit));
       const tickFmt = v => {
         if(v>=1000000) return 'Rs.'+(v/1000000).toFixed(1)+'M';
         if(v>=1000) return 'Rs.'+(v/1000).toFixed(0)+'k';
         return 'Rs.'+v;
       };
+      const maxVal2 = Math.max(chartRevenue, chartExpenses, chartStockVal, chartStockCost, Math.abs(chartProfit));
       charts.r=new Chart(rchartEl,{
         type:'bar',
         data:{
-          labels:['Net Revenue','Total Expenses','Stock Value','Net Profit'],
+          labels:['Net Revenue','Stock Value (Retail)','Stock Value (Cost)','Total Expenses','Net Profit'],
           datasets:[{
-            data:[chartRevenue, chartExpenses, chartStockVal, chartProfit],
-            backgroundColor:['#4caf80','#e57373','#7F77DD',chartProfit>=0?'#4caf80':'#e57373'],
+            data:[chartRevenue, chartStockVal, chartStockCost, chartExpenses, chartProfit],
+            backgroundColor:['#4caf80','#7F77DD','#9c6fe0','#e57373', chartProfit>=0?'#4caf80':'#e57373'],
             borderRadius:4
           }]
         },
@@ -860,14 +862,17 @@ function renderAnalytics(){
           responsive:true,
           maintainAspectRatio:false,
           indexAxis:'y',
-          plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmt(ctx.raw)}}},
+          plugins:{
+            legend:{display:false},
+            tooltip:{callbacks:{label:function(ctx){return ' '+fmt(ctx.raw);}}}
+          },
           scales:{
             x:{
               grid:{color:'rgba(255,255,255,.08)'},
               ticks:{font:{size:10},color:'rgba(255,255,255,.5)',callback:tickFmt},
-              suggestedMax: Math.max(maxVal * 1.2, 100000)
+              suggestedMax: Math.max(maxVal2*1.15, 100000)
             },
-            y:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.6)'}}
+            y:{grid:{display:false},ticks:{font:{size:11},color:'rgba(255,255,255,.7)'}}
           }
         }
       });
@@ -1504,78 +1509,100 @@ window.coReturn  = function(id){ coDo_return(id); };
 window.coDelete  = function(id){ coDo_delete(id); };
 
 function renderCusOrders(){
-  var fstatus = (document.getElementById('co-fstatus')||{}).value||'';
-  var srch = ((document.getElementById('co-srch')||{}).value||'').toLowerCase();
-  var recs = cusOrders.filter(function(o){
-    if(fstatus && o.status!==fstatus) return false;
-    if(srch && !(o.customer+(o.phone||'')+(o.id||'')).toLowerCase().includes(srch)) return false;
+  var fstatus=(document.getElementById('co-fstatus')||{}).value||'';
+  var srch=((document.getElementById('co-srch')||{}).value||'').toLowerCase();
+  var recs=cusOrders.filter(function(o){
+    if(fstatus&&o.status!==fstatus)return false;
+    if(srch&&!(o.customer+(o.phone||'')+(o.id||'')).toLowerCase().includes(srch))return false;
     return true;
   });
-  var el = document.getElementById('co-list');
-  if(!el){ renderCOMetrics(); return; }
+  var el=document.getElementById('co-list');
+  if(!el){renderCOMetrics();return;}
   if(!recs.length){
-    el.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text2)">No orders yet. Click "New customer order" to get started.</div>';
-    renderCOMetrics(); return;
+    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)"><i class="ti ti-package" style="font-size:28px;display:block;margin-bottom:8px"></i>No customer orders yet.</div>';
+    renderCOMetrics();return;
   }
-
-  var parts = [];
-  for(var ri=0; ri<recs.length; ri++){
-    var o = recs[ri];
-    var sid = JSON.stringify(o.id); // safe string like "ORD-123456"
-    var statusBg    = o.status==='delivered' ? 'var(--green-bg)'  : o.status==='returned' ? 'var(--red-bg)'   : 'var(--amber-bg)';
-    var statusColor = o.status==='delivered' ? 'var(--green)'     : o.status==='returned' ? 'var(--red)'      : 'var(--amber)';
-    var statusLabel = o.status==='delivered' ? '&#9989; Delivered' : o.status==='returned' ? '&#8617; Returned' : '&#8987; Pending';
-
-    var itemRows = '';
-    var items = o.items || [];
-    for(var ii=0; ii<items.length; ii++){
-      var it = items[ii];
-      itemRows += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">'
-        + '<span>' + (it.name||'') + (it.size?' ('+it.size+')':'') + ' x' + (it.qty||1) + '</span>'
-        + '<span style="font-weight:600">' + fmt(it.total||0) + '</span>'
-        + '</div>';
+  // Clear container
+  el.innerHTML='';
+  for(var ri=0;ri<recs.length;ri++){
+    var o=recs[ri];
+    var card=document.createElement('div');
+    card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px';
+    // Status
+    var statusBg=o.status==='delivered'?'var(--green-bg)':o.status==='returned'?'var(--red-bg)':'var(--amber-bg)';
+    var statusColor=o.status==='delivered'?'var(--green)':o.status==='returned'?'var(--red)':'var(--amber)';
+    var statusLabel=o.status==='delivered'?'✅ Delivered':o.status==='returned'?'↩ Returned':'⏳ Pending';
+    // Build items list
+    var itemsHTML='';
+    for(var ii=0;ii<(o.items||[]).length;ii++){
+      var it=o.items[ii];
+      itemsHTML+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>'+it.name+(it.size?' ('+it.size+')':'')+' x'+it.qty+'</span><span style="font-weight:600">'+fmt(it.total||0)+'</span></div>';
     }
-
-    var actionBtns = '';
-    if(o.status === 'pending'){
-      actionBtns = '<button onclick="window.coDeliver(' + sid + ')" style="font-size:12px;padding:7px 16px;background:#1d7a4f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">&#9989; Mark delivered</button>'
-                 + '<button onclick="window.coReturn(' + sid + ')" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px">&#8617; Mark returned</button>';
-    } else if(o.status === 'delivered'){
-      actionBtns = '<span style="font-size:12px;color:#4caf80;padding:4px 0;display:inline-block;margin-right:8px">&#9989; Delivered ' + (o.deliveredDate||'') + ' &mdash; sale auto-recorded</span>';
+    // Card HTML (no buttons yet)
+    card.innerHTML=''
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'
+        +'<div>'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
+            +'<span style="font-size:14px;font-weight:700">'+o.customer+'</span>'
+            +'<span style="font-size:11px;font-family:monospace;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px">'+o.id+'</span>'
+            +'<span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;background:'+statusBg+';color:'+statusColor+'">'+statusLabel+'</span>'
+          +'</div>'
+          +(o.phone?'<div style="font-size:12px;color:var(--text2)">📞 '+o.phone+(o.address?' &nbsp;📍 '+o.address:'')+'</div>':'')
+          +'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+o.date+' '+(o.time||'')+'</div>'
+        +'</div>'
+        +'<div style="text-align:right">'
+          +'<div style="font-size:18px;font-weight:700;color:var(--green)">'+fmt(o.grandTotal||0)+'</div>'
+          +'<div style="font-size:11px;color:#4caf80">Net: '+fmt(o.netTotal||o.grandTotal||0)+'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div style="background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:10px">'
+        +itemsHTML
+        +'<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>Subtotal</span><span>'+fmt(o.subTotal||0)+'</span></div>'
+        +((o.delivery||0)>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4caf80">+ Delivery</span><span style="color:#4caf80">'+fmt(o.delivery)+'</span></div>':'')
+        +((o.myDelivery||0)>0?'<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">- Courier fee</span><span style="color:var(--red)">'+fmt(o.myDelivery)+'</span></div>':'')
+        +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px;color:#4caf80"><span>💰 Net you receive</span><span>'+fmt(o.netTotal||o.grandTotal||0)+'</span></div>'
+      +'</div>'
+      +(o.notes?'<div style="font-size:12px;color:var(--text2);margin-bottom:10px">📝 '+o.notes+'</div>':'')
+      +'<div class="co-btn-row" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"></div>';
+    
+    // Create buttons using DOM - NO onclick strings, just addEventListener
+    var btnRow=card.querySelector('.co-btn-row');
+    var oid=o.id; // capture for closure
+    var ostatus=o.status;
+    
+    if(ostatus==='pending'){
+      // Deliver button
+      var btnD=document.createElement('button');
+      btnD.textContent='✅ Mark delivered';
+      btnD.style.cssText='font-size:12px;padding:7px 16px;background:#1d7a4f;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px';
+      (function(id){
+        btnD.addEventListener('click',function(){coDo_deliver(id);});
+      })(oid);
+      btnRow.appendChild(btnD);
+      // Return button
+      var btnR=document.createElement('button');
+      btnR.textContent='↩ Mark returned';
+      btnR.style.cssText='font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;font-weight:600;margin-right:6px';
+      (function(id){
+        btnR.addEventListener('click',function(){coDo_return(id);});
+      })(oid);
+      btnRow.appendChild(btnR);
     } else {
-      actionBtns = '<span style="font-size:12px;color:var(--red);padding:4px 0;display:inline-block;margin-right:8px">&#8617; Returned ' + (o.returnedDate||'') + '</span>';
+      var infoSpan=document.createElement('span');
+      infoSpan.style.cssText='font-size:12px;padding:4px 0;display:inline-block;margin-right:8px;color:'+(ostatus==='delivered'?'#4caf80':'var(--red)');
+      infoSpan.textContent=ostatus==='delivered'?'✅ Delivered '+(o.deliveredDate||'')+' — sale recorded':'↩ Returned '+(o.returnedDate||'');
+      btnRow.appendChild(infoSpan);
     }
-    actionBtns += '<button onclick="window.coDelete(' + sid + ')" style="font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto">&#128465; Delete</button>';
-
-    var card = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px 16px;margin-bottom:10px">'
-      + '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'
-        + '<div>'
-          + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
-            + '<span style="font-size:14px;font-weight:700">' + (o.customer||'') + '</span>'
-            + '<span style="font-family:monospace;font-size:11px;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px">' + (o.id||'') + '</span>'
-            + '<span style="font-size:11px;padding:3px 10px;border-radius:999px;font-weight:600;background:' + statusBg + ';color:' + statusColor + '">' + statusLabel + '</span>'
-          + '</div>'
-          + (o.phone ? '<div style="font-size:12px;color:var(--text2)">&#128222; ' + o.phone + (o.address ? '&nbsp;&nbsp;&#128205; ' + o.address : '') + '</div>' : '')
-          + '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + (o.date||'') + ' ' + (o.time||'') + '</div>'
-        + '</div>'
-        + '<div style="text-align:right">'
-          + '<div style="font-size:18px;font-weight:700;color:var(--green)">' + fmt(o.grandTotal||0) + '</div>'
-          + '<div style="font-size:11px;color:#4caf80">Net: ' + fmt(o.netTotal||o.grandTotal||0) + '</div>'
-        + '</div>'
-      + '</div>'
-      + '<div style="background:var(--surface2);border-radius:var(--r);padding:10px;margin-bottom:10px">'
-        + itemRows
-        + '<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>Items subtotal</span><span>' + fmt(o.subTotal||0) + '</span></div>'
-        + ((o.delivery||0)>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4caf80">+ Delivery charged</span><span style="color:#4caf80">' + fmt(o.delivery) + '</span></div>' : '')
-        + ((o.myDelivery||0)>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--red)">- Courier fee</span><span style="color:var(--red)">' + fmt(o.myDelivery) + '</span></div>' : '')
-        + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:4px;color:#4caf80"><span>&#128176; Net you receive</span><span>' + fmt(o.netTotal||o.grandTotal||0) + '</span></div>'
-      + '</div>'
-      + (o.notes ? '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">&#128221; ' + o.notes + '</div>' : '')
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' + actionBtns + '</div>'
-    + '</div>';
-    parts.push(card);
+    // Delete button (always shown)
+    var btnX=document.createElement('button');
+    btnX.textContent='🗑 Delete';
+    btnX.style.cssText='font-size:12px;padding:7px 14px;background:var(--red-bg);color:var(--red);border:1px solid var(--red);border-radius:6px;cursor:pointer;margin-left:auto';
+    (function(id){
+      btnX.addEventListener('click',function(){coDo_delete(id);});
+    })(oid);
+    btnRow.appendChild(btnX);
+    el.appendChild(card);
   }
-  el.innerHTML = parts.join('');
   renderCOMetrics();
 }
 
